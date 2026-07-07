@@ -1,0 +1,125 @@
+@import "./styles/prototype.css";
+
+html,
+body,
+#app,
+.taro_page,
+.taro_tabbar_page,
+.taro_page_show,
+.taro_page_stationed {
+  width: 100%;
+  min-height: 100%;
+}
+
+body {
+  display: block;
+  padding: 0;
+  margin: 0;
+  background: linear-gradient(180deg, var(--bg), var(--bg-2));
+  color: var(--text);
+}
+
+page {
+  min-height: 100%;
+  background: #09101d;
+}
+
+taro-view-core,
+taro-image-core,
+taro-scroll-view-core,
+taro-swiper-core,
+taro-swiper-item-core {
+  display: block;
+  box-sizing: border-box;
+}
+
+taro-button-core,
+taro-input-core {
+  box-sizing: border-box;
+}
+
+#app {
+  position: relative;
+  width: 100vw;
+  min-height: 100vh;
+}
+
+.page-shell {
+  width: 100%;
+  min-height: 100vh;
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 20px 18px 120px;
+}
+
+.page,
+.page-section,
+.hero-card,
+.search-bar,
+.filter-block,
+.task-list,
+.task-shell,
+.thread,
+.composer,
+.workshop-rack,
+.service-rack,
+.resume-rack,
+.asset-rack,
+.auth-rack,
+.notice-rack,
+.workspace-sheet {
+  width: 100%;
+}
+
+.taro_page,
+.taro_tabbar_page,
+.taro_page_show,
+.taro_page_stationed {
+  position: absolute;
+  inset: 0;
+  width: 100vw !important;
+  min-height: 100vh;
+}
+
+.page {
+  position: static;
+  inset: auto;
+  display: grid;
+  overflow: visible;
+  padding: 0;
+  gap: 12px;
+  align-content: start;
+}
+
+.section-title,
+.task-title,
+.task-shell-title,
+.file-name {
+  display: block;
+}
+
+.active {
+  opacity: 1;
+}
+
+@media (min-width: 481px) {
+  .taro-tabbar__container,
+  .taro-tabbar__panel {
+    max-width: 480px;
+    margin: 0 auto;
+  }
+
+  .taro-tabbar__tabbar.taro-tabbar__tabbar-bottom,
+  .weui-tabbar {
+    width: 480px !important;
+    max-width: calc(100vw - 32px) !important;
+    left: 50% !important;
+    right: auto !important;
+    transform: translateX(-50%);
+    border-left: 1px solid var(--line);
+    border-right: 1px solid var(--line);
+    border-top-left-radius: 18px;
+    border-top-right-radius: 18px;
+    overflow: hidden;
+  }
+}

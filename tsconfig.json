@@ -1,0 +1,35 @@
+{
+  "compilerOptions": {
+    "target": "es2017",
+    "module": "commonjs",
+    "removeComments": false,
+    "preserveConstEnums": true,
+    "moduleResolution": "node",
+    "experimentalDecorators": true,
+    "noImplicitAny": false,
+    "allowSyntheticDefaultImports": true,
+    "outDir": "lib",
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "strictNullChecks": true,
+    "skipLibCheck": true,
+    "sourceMap": true,
+    "rootDir": "../..",
+    "jsx": "react-jsx",
+    "allowJs": true,
+    "resolveJsonModule": true,
+    "typeRoots": [
+      "node_modules/@types"
+    ],
+    "paths": {
+      // TS5090 leading './'
+      "@/*": ["./src/*"],
+      "@lingban/api-sdk": ["../../packages/api-sdk/src/index.ts"],
+      "@lingban/contracts": ["../../packages/contracts/src/index.ts"],
+      "@lingban/domain-models": ["../../packages/domain-models/src/index.ts"],
+      "@lingban/ui-tokens": ["../../packages/ui-tokens/src/index.ts"]
+    }
+  },
+  "include": ["./src", "./types", "./config"],
+  "compileOnSave": false
+}
