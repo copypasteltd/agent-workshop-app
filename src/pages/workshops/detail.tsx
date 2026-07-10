@@ -1,3 +1,4 @@
+import { useQuery } from "@tanstack/react-query";
 import { matchesSearchQuery } from "@lingban/domain-models";
 import { Button, Image, Input, View } from "@tarojs/components";
 import Taro, { getCurrentInstance } from "@tarojs/taro";
@@ -5,36 +6,96 @@ import { useEffect, useMemo, useState } from "react";
 import workshopDrama from "../../assets/workshop-drama.svg";
 import workshopImage from "../../assets/workshop-image.svg";
 import workshopTax from "../../assets/workshop-tax.svg";
-import { mobileWorkshopDetailContent } from "../../data/mobileDetailContent";
+import { mobileCatalogApi } from "../../lib/api";
 import {
-  findVisibleWorkshop,
-  getVisibleServicesForWorkshop,
-  getWorkspaceEntry,
-} from "../../data/workspaceCatalog";
-import { useMobileUiStore } from "../../stores/mobileUiStore";
+  buildMobileWorkshopLaunchFlow,
+  mapServiceCatalogEntryToMobileService,
+  mapWorkshopCatalogEntryToMobileWorkshop,
+  resolveMobileEntrySurface,
+} from "../../lib/catalog";
+import { useMobileRecentRecorder } from "../../lib/recent";
+import { useMobileWorkspaceCatalog } from "../../lib/useMobileWorkspaceCatalog";
+import { useResolvedMobileWorkspace } from "../../lib/useMobileWorkspace";
 
 const workshopCoverMap: Record<string, string> = {
   "enterprise-tax": workshopTax,
   "creator-drama": workshopDrama,
-  "brand-content": workshopImage,
+  "brand-poster-suite": workshopImage,
 };
 
 export default function WorkshopDetailPage() {
   const id = getCurrentInstance().router?.params?.id;
   const [searchQuery, setSearchQuery] = useState("");
-  const currentWorkspaceId = useMobileUiStore((state) => state.currentWorkspaceId);
-  const currentWorkspace = getWorkspaceEntry(currentWorkspaceId);
-  const workshop = useMemo(() => findVisibleWorkshop(id, currentWorkspace.id), [currentWorkspace.id, id]);
-  const services = useMemo(
-    () => (workshop ? getVisibleServicesForWorkshop(workshop.id, currentWorkspace.id) : []),
-    [currentWorkspace.id, workshop]
+  const currentWorkspace = useResolvedMobileWorkspace();
+  const { visibleServices, visibleWorkshops } = useMobileWorkspaceCatalog(currentWorkspace);
+  const entrySurface = resolveMobileEntrySurface();
+  const workshopQuery = useQuery({
+    queryKey: [
+      "mobile",
+      "catalog",
+      "workshop",
+      currentWorkspace.selectionId,
+      currentWorkspace.id,
+      entrySurface,
+      id,
+    ],
+    queryFn: async () => {
+      if (!id) {
+        return null;
+      }
+
+      return mobileCatalogApi.getWorkshop(id, {
+        workspaceContextKey: currentWorkspace.id,
+        entrySurface,
+      });
+    },
+    enabled: Boolean(id),
+    retry: false,
+    staleTime: 30_000,
+  });
+
+  const fallbackWorkshop = useMemo(
+    () => {
+      const matched = visibleWorkshops.find((item) => item.id === id) ?? null;
+      if (matched) {
+        return matched;
+      }
+
+      return currentWorkspace.source === "static" ? visibleWorkshops[0] ?? null : null;
+    },
+    [currentWorkspace.source, id, visibleWorkshops]
   );
-  const detailContent = workshop ? mobileWorkshopDetailContent[workshop.id] : null;
-  const filteredServices = useMemo(() => {
-    return services.filter((service) =>
-      matchesSearchQuery(searchQuery, [service.name, service.summary, service.auth, service.eta])
-    );
-  }, [searchQuery, services]);
+
+  const workshop = useMemo(
+    () =>
+      workshopQuery.data
+        ? mapWorkshopCatalogEntryToMobileWorkshop(workshopQuery.data)
+        : fallbackWorkshop,
+    [fallbackWorkshop, workshopQuery.data]
+  );
+
+  const services = useMemo(
+    () =>
+      workshopQuery.data
+        ? workshopQuery.data.services.map(mapServiceCatalogEntryToMobileService)
+        : workshop
+          ? visibleServices.filter((item) => item.workshopId === workshop.id)
+          : [],
+    [visibleServices, workshop, workshopQuery.data]
+  );
+
+  const launchFlow = useMemo(
+    () => (workshopQuery.data ? buildMobileWorkshopLaunchFlow(workshopQuery.data) : []),
+    [workshopQuery.data]
+  );
+
+  const filteredServices = useMemo(
+    () =>
+      services.filter((service) =>
+        matchesSearchQuery(searchQuery, [service.name, service.summary, service.auth, service.eta])
+      ),
+    [searchQuery, services]
+  );
 
   useEffect(() => {
     if (!id || !workshop || workshop.id === id) {
@@ -44,12 +105,26 @@ export default function WorkshopDetailPage() {
     Taro.redirectTo({ url: `/pages/workshops/detail?id=${workshop.id}` });
   }, [id, workshop]);
 
+  useMobileRecentRecorder(
+    workshop && currentWorkspace.source === "auth"
+      ? {
+          resourceType: "workshop",
+          workshopId: workshop.id,
+          interaction: "open",
+          sourceSurface: entrySurface,
+        }
+      : null,
+    currentWorkspace.source === "auth"
+  );
+
   if (!workshop) {
     return (
       <View className="page-shell">
         <View className="hero-card">
           <View className="section-title">当前工作区暂无可见工坊</View>
-          <View className="section-copy">切换工作区后再回来，或直接回到工坊首页选择其他入口。</View>
+          <View className="section-copy">
+            切换工作区后再回来，或直接回到工坊首页选择其他入口。
+          </View>
           <Button className="pill active" onClick={() => Taro.switchTab({ url: "/pages/workshops/index" })}>
             返回工坊
           </Button>
@@ -69,7 +144,11 @@ export default function WorkshopDetailPage() {
 
       <View className="page-section">
         <View className="hero-card">
-          <Image className="cover" src={workshopCoverMap[workshop.id]} mode="aspectFill" />
+          <Image
+            className="cover"
+            src={workshopCoverMap[workshop.id] ?? workshopTax}
+            mode="aspectFill"
+          />
           <View className="section-head" style={{ marginTop: "14px" }}>
             <View>
               <View className="page-eyebrow">当前工坊</View>
@@ -82,7 +161,7 @@ export default function WorkshopDetailPage() {
             <View className="pill">{workshop.owner}</View>
             <View className="pill success">{currentWorkspace.name}</View>
             <View className="pill">{services.length} 个可启服务</View>
-            {detailContent?.highlights.map((item) => (
+            {(workshopQuery.data?.tagList ?? []).map((item) => (
               <View className="pill active" key={item}>
                 {item}
               </View>
@@ -94,15 +173,15 @@ export default function WorkshopDetailPage() {
               <View className="file-meta mono">{currentWorkspace.root}</View>
             </View>
           </View>
-          {detailContent ? (
+          {workshopQuery.data ? (
             <View className="summary-grid">
               <View className="summary-card">
                 <View className="summary-label">适用对象</View>
-                <View className="summary-value">{detailContent.audience}</View>
+                <View className="summary-value">{workshopQuery.data.audience.zh}</View>
               </View>
               <View className="summary-card">
-                <View className="summary-label">使用边界</View>
-                <View className="summary-value">{detailContent.boundary}</View>
+                <View className="summary-label">后续链路</View>
+                <View className="summary-value">{workshopQuery.data.nextStepSummary.zh}</View>
               </View>
             </View>
           ) : null}
@@ -129,7 +208,7 @@ export default function WorkshopDetailPage() {
           {filteredServices.length === 0 ? (
             <View className="empty-state">
               <View className="section-title">没有匹配服务</View>
-              <View className="empty-copy">可按服务名称、授权方式或结果类型搜索。</View>
+              <View className="empty-copy">可以按服务名称、授权方式或结果类型搜索。</View>
             </View>
           ) : null}
           {filteredServices.map((service) => (
@@ -153,7 +232,7 @@ export default function WorkshopDetailPage() {
         </View>
       </View>
 
-      {detailContent ? (
+      {workshopQuery.data ? (
         <View className="page-section">
           <View className="section-head">
             <View>
@@ -162,18 +241,19 @@ export default function WorkshopDetailPage() {
             </View>
           </View>
           <View className="file-card">
-            <View className="file-name">当前工坊常见结果</View>
-            <View className="pill-row">
-              {detailContent.outputs.map((item) => (
-                <View className="pill" key={item}>
-                  {item}
+            <View className="file-name">工坊输出契约</View>
+            {workshopQuery.data.services.map((service) => (
+              <View className="file-row" key={service.serviceId}>
+                <View>
+                  <View className="file-name">{service.displayName.zh}</View>
+                  <View className="file-meta">{service.outputContractSummary.zh}</View>
                 </View>
-              ))}
-            </View>
+              </View>
+            ))}
           </View>
           <View className="file-card">
             <View className="file-name">标准启动流程</View>
-            {detailContent.flow.map((item, index) => (
+            {launchFlow.map((item, index) => (
               <View className="file-row" key={`${index + 1}-${item}`}>
                 <View>
                   <View className="file-name">步骤 {index + 1}</View>

@@ -1,56 +1,75 @@
-import { matchesSearchQuery } from "@lingban/domain-models";
 import { useQuery } from "@tanstack/react-query";
+import { matchesSearchQuery } from "@lingban/domain-models";
 import { Button, Input, View } from "@tarojs/components";
 import Taro from "@tarojs/taro";
 import { useMemo, useState } from "react";
-import {
-  getVisibleTasks,
-  getWorkspaceEntry,
-  normalizeMobileWorkspaceId,
-} from "../../data/workspaceCatalog";
 import { mobileRunsApi } from "../../lib/api";
 import { mapRunSnapshotToMobileTask } from "../../lib/liveTaskAdapters";
-import { useMobileUiStore } from "../../stores/mobileUiStore";
+import { useMobileWorkspaceCatalog } from "../../lib/useMobileWorkspaceCatalog";
+import { useResolvedMobileWorkspace } from "../../lib/useMobileWorkspace";
 
 export default function TasksPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "running" | "approval" | "done">("all");
   const [tagFilter, setTagFilter] = useState("all");
-  const currentWorkspaceId = useMobileUiStore((state) => state.currentWorkspaceId);
-  const currentWorkspace = getWorkspaceEntry(currentWorkspaceId);
-  const staticTasks = getVisibleTasks(currentWorkspace.id);
+  const currentWorkspace = useResolvedMobileWorkspace();
+  const { availableTaskTags, combinedTasks, taskDataMode } = useMobileWorkspaceCatalog(currentWorkspace);
 
-  const runsQuery = useQuery({
-    queryKey: ["mobile", "runs"],
+  const filteredRunsQuery = useQuery({
+    queryKey: [
+      "mobile",
+      "runs",
+      "filtered",
+      currentWorkspace.selectionId,
+      currentWorkspace.id,
+      statusFilter,
+      tagFilter,
+      searchQuery,
+    ],
     queryFn: async () => {
       try {
-        return await mobileRunsApi.listRuns();
+        return await mobileRunsApi.listRuns({
+          q: searchQuery.trim() || undefined,
+          attentionMode:
+            statusFilter === "all"
+              ? undefined
+              : statusFilter === "running"
+                ? "running"
+                : statusFilter === "approval"
+                  ? "todo"
+                  : "done",
+          tag: tagFilter === "all" ? undefined : tagFilter,
+        });
       } catch {
         return [];
       }
     },
     refetchInterval: 10_000,
+    retry: false,
   });
 
-  const liveTasks = (runsQuery.data ?? [])
-    .map((snapshot) => mapRunSnapshotToMobileTask(snapshot))
-    .filter((item) => normalizeMobileWorkspaceId(item.workspaceId) === currentWorkspace.id);
-
-  const staticIds = new Set(staticTasks.map((item) => item.id));
-  const combinedTasks = [...liveTasks.filter((item) => !staticIds.has(item.id)), ...staticTasks];
-  const availableTags = useMemo(() => {
-    const tags = Array.from(
-      new Set(
-        combinedTasks
-          .flatMap((item) => item.tags)
-          .filter((tag) => tag.startsWith("#"))
-      )
-    );
-
-    return tags.slice(0, 4);
-  }, [combinedTasks]);
+  const filteredLiveTasks = useMemo(
+    () =>
+      [...(filteredRunsQuery.data ?? [])]
+        .sort((left, right) => right.run.updatedAt.localeCompare(left.run.updatedAt))
+        .map((snapshot) => mapRunSnapshotToMobileTask(snapshot, undefined, currentWorkspace))
+        .filter((item) => item.workspaceId === currentWorkspace.id),
+    [currentWorkspace, filteredRunsQuery.data]
+  );
 
   const filteredTasks = useMemo(() => {
+    if (taskDataMode === "live") {
+      if (!filteredRunsQuery.isSuccess && filteredRunsQuery.fetchStatus !== "idle") {
+        return combinedTasks;
+      }
+
+      return filteredLiveTasks;
+    }
+
+    if (taskDataMode === "empty") {
+      return [];
+    }
+
     return combinedTasks.filter((item) => {
       const statusMatched = statusFilter === "all" || item.status === statusFilter;
       const tagMatched = tagFilter === "all" || item.tags.includes(tagFilter);
@@ -70,28 +89,72 @@ export default function TasksPage() {
         ...item.tags,
       ]);
     });
-  }, [combinedTasks, searchQuery, statusFilter, tagFilter]);
+  }, [
+    combinedTasks,
+    filteredLiveTasks,
+    filteredRunsQuery.fetchStatus,
+    filteredRunsQuery.isSuccess,
+    searchQuery,
+    statusFilter,
+    tagFilter,
+    taskDataMode,
+  ]);
+
+  const statusOptions = [
+    { key: "all" as const, label: "All" },
+    { key: "running" as const, label: "Running" },
+    { key: "approval" as const, label: "Needs approval" },
+    { key: "done" as const, label: "Done" },
+  ];
+
+  const listSummary =
+    taskDataMode === "live"
+      ? `${filteredTasks.length} live run${filteredTasks.length === 1 ? "" : "s"} in ${currentWorkspace.name}`
+      : taskDataMode === "static"
+        ? `${filteredTasks.length} sample task${filteredTasks.length === 1 ? "" : "s"} in preview mode`
+        : `No continuing runs in ${currentWorkspace.name}`;
 
   return (
     <View className="page-shell">
-      <View className="page" data-page="tasks">
+      <View className="page" data-page="tasks" data-testid="mobile-tasks-page">
         <View className="search-bar">
           <Input
             className="search-input"
             value={searchQuery}
-            placeholder="搜索任务名 / 工坊 / 标签"
+            placeholder="Search task, workshop, or tag"
             onInput={(event) => setSearchQuery(event.detail.value)}
           />
         </View>
 
         <View className="filter-block">
+          {taskDataMode === "static" ? (
+            <View className="file-card">
+              <View className="card-row">
+                <View>
+                  <View className="file-name">Preview task structure</View>
+                  <View className="file-meta">
+                    This workspace is still showing sample tasks so interaction and layout can be reviewed before a real run is started.
+                  </View>
+                </View>
+                <View className="pill warn">preview</View>
+              </View>
+            </View>
+          ) : taskDataMode === "empty" ? (
+            <View className="file-card">
+              <View className="card-row">
+                <View>
+                  <View className="file-name">No live runs yet</View>
+                  <View className="file-meta">
+                    This workspace is already using authoritative data. Start a new instance from Workshop to open a real conversation.
+                  </View>
+                </View>
+                <View className="pill">0 run</View>
+              </View>
+            </View>
+          ) : null}
+
           <View className="pill-row">
-            {[
-              { key: "all" as const, label: "全部" },
-              { key: "running" as const, label: "运行中" },
-              { key: "approval" as const, label: "待确认" },
-              { key: "done" as const, label: "已完成" },
-            ].map((item) => (
+            {statusOptions.map((item) => (
               <Button
                 className={`task-chip ${statusFilter === item.key ? "active" : ""}`}
                 key={item.key}
@@ -101,15 +164,16 @@ export default function TasksPage() {
               </Button>
             ))}
           </View>
+
           <View className="pill-row">
             <View className="task-chip active">{currentWorkspace.name}</View>
             <Button
               className={`task-chip ${tagFilter === "all" ? "active" : ""}`}
               onClick={() => setTagFilter("all")}
             >
-              全部标签
+              All tags
             </Button>
-            {availableTags.map((tag) => (
+            {availableTaskTags.map((tag) => (
               <Button
                 className={`task-chip ${tagFilter === tag ? "active" : ""}`}
                 key={tag}
@@ -119,23 +183,31 @@ export default function TasksPage() {
               </Button>
             ))}
           </View>
-          <View className="muted">当前命中 {filteredTasks.length} 个任务，点入后进入完整对话工作面。</View>
+
+          <View className="muted">{listSummary}</View>
         </View>
 
         <View className="task-list">
           {filteredTasks.length === 0 ? (
             <View className="empty-state">
-              <View className="section-title">没有匹配任务</View>
-              <View className="empty-copy">可以清空搜索词，或切换状态和标签筛选。</View>
+              <View className="section-title">
+                {taskDataMode === "empty" ? "No runs in this workspace" : "No matching tasks"}
+              </View>
+              <View className="empty-copy">
+                {taskDataMode === "empty"
+                  ? "Go back to Workshop and start a new agent instance to begin a full conversation."
+                  : "Clear the search or switch the status and tag filters."}
+              </View>
             </View>
           ) : null}
+
           {filteredTasks.map((item) => (
             <View className={`task-card ${item.id === filteredTasks[0]?.id ? "active" : ""}`} key={item.id}>
               <View className="card-row">
                 <View>
                   <View className="task-title">{item.title}</View>
                   <View className="task-meta">
-                    工坊：{item.workshop} / {item.updatedAt}
+                    {item.workshop} / {item.updatedAt}
                   </View>
                 </View>
                 <View className={`pill ${item.statusClass}`}>{item.statusLabel}</View>
@@ -147,12 +219,18 @@ export default function TasksPage() {
                     {tag}
                   </View>
                 ))}
-                {item.id.startsWith("run_") ? <View className="pill success">live</View> : null}
+                <View className={`pill ${item.id.startsWith("run_") ? "success" : "warn"}`}>
+                  {item.id.startsWith("run_") ? "live" : "sample"}
+                </View>
               </View>
               <View className="card-row">
-                <View className="muted">进入当前实例的完整对话</View>
-                <Button className="pill active" onClick={() => Taro.navigateTo({ url: `/pages/tasks/detail?id=${item.id}` })}>
-                  打开
+                <View className="muted">Open the full task conversation</View>
+                <Button
+                  className="pill active"
+                  data-testid={`mobile-task-open-${item.id}`}
+                  onClick={() => Taro.navigateTo({ url: `/pages/tasks/detail?id=${item.id}` })}
+                >
+                  Open
                 </Button>
               </View>
             </View>

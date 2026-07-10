@@ -2,14 +2,18 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useLaunch } from "@tarojs/taro";
 import type { PropsWithChildren } from "react";
 import { useEffect, useMemo } from "react";
-import { getWorkspaceEntry } from "./data/workspaceCatalog";
+import { MobileAuthGate } from "./components/MobileAuthGate";
 import { applyMobileTheme } from "./lib/theme";
+import { useResolvedMobileWorkspace } from "./lib/useMobileWorkspace";
+import { useMobileAuthStore } from "./stores/mobileAuthStore";
 import { useMobileUiStore } from "./stores/mobileUiStore";
 import "./app.css";
 
 function App({ children }: PropsWithChildren) {
   const theme = useMobileUiStore((state) => state.theme);
-  const currentWorkspaceId = useMobileUiStore((state) => state.currentWorkspaceId);
+  const authMode = useMobileAuthStore((state) => state.authMode);
+  const authenticated = useMobileAuthStore((state) => state.authenticated);
+  const currentWorkspace = useResolvedMobileWorkspace();
   const queryClient = useMemo(
     () =>
       new QueryClient({
@@ -32,14 +36,19 @@ function App({ children }: PropsWithChildren) {
       return;
     }
 
-    const currentWorkspace = getWorkspaceEntry(currentWorkspaceId);
-
-    document.title = `${currentWorkspace.name} / 灵办词元`;
+    document.title =
+      authMode !== "disabled" && !authenticated
+        ? "灵办词元 / 登录"
+        : `${currentWorkspace.name} / 灵办词元`;
     document.body.dataset.theme = theme;
     applyMobileTheme(theme);
-  }, [currentWorkspaceId, theme]);
+  }, [authMode, authenticated, currentWorkspace.name, theme]);
 
-  return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
+  return (
+    <QueryClientProvider client={queryClient}>
+      <MobileAuthGate>{children}</MobileAuthGate>
+    </QueryClientProvider>
+  );
 }
 
 export default App;

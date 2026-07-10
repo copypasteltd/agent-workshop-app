@@ -38,6 +38,7 @@ export type MobileTaskMessage = {
   time: string;
   body: string;
   kind: "system" | "user" | "agent";
+  attachments?: Array<{ label: string; path: string }>;
   module?: MobileTaskMessageModule;
 };
 
@@ -56,6 +57,12 @@ export type MobileService = {
   summary: string;
   auth: string;
   eta: string;
+  outputSummary?: string;
+  targetPathHint?: string;
+  launchMode?: "instant-conversation" | "form-first" | "approval-first";
+  requiredFirstPartyMcpIds?: string[];
+  externalConnectorRefs?: string[];
+  credentialIds?: string[];
 };
 
 export type MobileWorkspaceEntry = {
@@ -86,7 +93,7 @@ export const workshops: MobileWorkshop[] = [
     badge: "Creator 工坊",
   },
   {
-    id: "brand-content",
+    id: "brand-poster-suite",
     name: "品牌内容工坊",
     owner: "品牌内容组",
     description:
@@ -114,7 +121,7 @@ export const services: MobileService[] = [
   },
   {
     id: "poster-batch",
-    workshopId: "brand-content",
+    workshopId: "brand-poster-suite",
     name: "品牌海报批量生成",
     summary: "围绕品牌约束批量生成海报、KV 和提示词归档，结果包会同步沉淀到任务页和我的资产。",
     auth: "图像能力额度 / 只读密钥挂载",

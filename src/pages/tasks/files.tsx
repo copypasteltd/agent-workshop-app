@@ -1,28 +1,125 @@
+import type { RunFileEntry } from "@lingban/contracts";
 import { matchesSearchQuery } from "@lingban/domain-models";
 import { useQuery } from "@tanstack/react-query";
-import { Button, Input, View } from "@tarojs/components";
+import { Button, Image, Input, View } from "@tarojs/components";
 import Taro, { getCurrentInstance } from "@tarojs/taro";
 import { useEffect, useMemo, useState } from "react";
 import {
+  findStaticTaskById,
   findVisibleTask,
-  getWorkspaceEntry,
-  normalizeMobileWorkspaceId,
 } from "../../data/workspaceCatalog";
-import { buildMobileRunFileDownloadUrl, mobileRunsApi } from "../../lib/api";
+import { mobileRunsApi, requestMobileRunFileDownloadUrl } from "../../lib/api";
 import { isLiveTaskId, mapRunSnapshotToMobileTask } from "../../lib/liveTaskAdapters";
+import {
+  mobileRunDetailQueryKey,
+  mobileRunFilesQueryKey,
+  mobileRunPreviewQueryKey,
+} from "../../lib/runQueryKeys";
+import { useMobileRecentRecorder } from "../../lib/recent";
 import { useMobileRunStream } from "../../lib/runStream";
-import { useMobileUiStore } from "../../stores/mobileUiStore";
+import { useResolvedMobileWorkspace } from "../../lib/useMobileWorkspace";
+
+function ensureTrailingSlash(value: string) {
+  return value.endsWith("/") ? value : `${value}/`;
+}
+
+function formatFileSize(sizeBytes: number | null | undefined) {
+  if (sizeBytes == null) {
+    return "--";
+  }
+
+  if (sizeBytes < 1024) {
+    return `${sizeBytes}b`;
+  }
+
+  if (sizeBytes < 1024 * 1024) {
+    return `${(sizeBytes / 1024).toFixed(1)}kb`;
+  }
+
+  return `${(sizeBytes / (1024 * 1024)).toFixed(1)}mb`;
+}
+
+function formatUpdatedAt(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return date.toLocaleTimeString("zh-CN", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+}
+
+function toRelativePath(filePath: string, targetPath: string) {
+  return filePath.startsWith(targetPath) ? filePath.slice(targetPath.length) || filePath : filePath;
+}
+
+function toLiveFileStatus(kind: RunFileEntry["kind"]) {
+  switch (kind) {
+    case "receipt":
+      return "回执";
+    case "archive":
+      return "归档";
+    case "log":
+      return "日志";
+    case "screenshot":
+      return "预览";
+    case "output":
+    default:
+      return "结果";
+  }
+}
+
+function toLiveFileHelper(kind: RunFileEntry["kind"]) {
+  switch (kind) {
+    case "receipt":
+      return "来自当前实例目录的回执或交付文件。";
+    case "archive":
+      return "来自当前实例目录的归档与审计材料。";
+    case "log":
+      return "来自当前实例目录的运行日志。";
+    case "screenshot":
+      return "来自当前实例目录的截图或可视化预览文件。";
+    case "output":
+    default:
+      return "来自当前任务实例 target path 的结果文件。";
+  }
+}
+
+function buildLivePathOptions(targetPath: string, entries: RunFileEntry[]) {
+  const targetRoot = ensureTrailingSlash(targetPath);
+  const directoryPaths = new Set<string>([targetRoot]);
+
+  for (const entry of entries) {
+    const normalizedPath = entry.path.endsWith("/") ? entry.path : ensureTrailingSlash(entry.path.split("/").slice(0, -1).join("/"));
+    if (normalizedPath && normalizedPath.startsWith(targetRoot)) {
+      directoryPaths.add(normalizedPath);
+    }
+  }
+
+  return [...directoryPaths]
+    .sort((left, right) => left.localeCompare(right))
+    .map((dirPath, index) => ({
+      label:
+        dirPath === targetRoot
+          ? "实例目录"
+          : toRelativePath(dirPath, targetRoot).replace(/\/+$/, "") || `目录 ${index}`,
+      path: dirPath,
+      helper: "当前任务 target path 内可浏览的挂载目录。",
+    }));
+}
 
 export default function TaskFilesPage() {
   const id = getCurrentInstance().router?.params?.id;
   const liveTaskId = isLiveTaskId(id);
-  const currentWorkspaceId = useMobileUiStore((state) => state.currentWorkspaceId);
-  const currentWorkspace = getWorkspaceEntry(currentWorkspaceId);
+  const currentWorkspace = useResolvedMobileWorkspace();
   useMobileRunStream(liveTaskId ? id ?? null : null, liveTaskId);
 
   const liveRunDetailQuery = useQuery({
     enabled: liveTaskId,
-    queryKey: ["mobile", "runs", id],
+    queryKey: id ? mobileRunDetailQueryKey(id) : ["mobile", "runs", "missing-detail"],
     queryFn: async () => {
       const runId = id;
       if (!runId || !isLiveTaskId(runId)) {
@@ -40,7 +137,7 @@ export default function TaskFilesPage() {
 
   const liveRunFilesQuery = useQuery({
     enabled: liveTaskId,
-    queryKey: ["mobile", "runs", id, "files"],
+    queryKey: id ? mobileRunFilesQueryKey(id) : ["mobile", "runs", "missing-files"],
     queryFn: async () => {
       const runId = id;
       if (!runId || !isLiveTaskId(runId)) {
@@ -56,53 +153,144 @@ export default function TaskFilesPage() {
     refetchInterval: 10_000,
   });
 
+  const mappedLiveTask = useMemo(() => {
+    if (!liveRunDetailQuery.data) {
+      return null;
+    }
+
+    return mapRunSnapshotToMobileTask(
+      liveRunDetailQuery.data,
+      liveRunFilesQuery.data,
+      currentWorkspace
+    );
+  }, [currentWorkspace, liveRunDetailQuery.data, liveRunFilesQuery.data]);
+  const staticVisibleTask = useMemo(
+    () =>
+      currentWorkspace.source === "static"
+        ? findVisibleTask(id, currentWorkspace.id)
+        : null,
+    [currentWorkspace.id, currentWorkspace.source, id]
+  );
+  const staticTaskAcrossWorkspaces = useMemo(() => findStaticTaskById(id), [id]);
+  const routeLiveTaskOutOfScope = Boolean(
+    liveTaskId &&
+      !(liveRunDetailQuery.isPending || liveRunFilesQuery.isPending) &&
+      mappedLiveTask &&
+      mappedLiveTask.workspaceId !== currentWorkspace.id
+  );
+  const routeStaticTaskOutOfScope = Boolean(
+    !liveTaskId &&
+      currentWorkspace.source === "static" &&
+      id &&
+      !staticVisibleTask &&
+      staticTaskAcrossWorkspaces
+  );
+  const routeTaskOutOfScope = routeLiveTaskOutOfScope || routeStaticTaskOutOfScope;
+
   const task = useMemo(() => {
     if (liveTaskId && (liveRunDetailQuery.isPending || liveRunFilesQuery.isPending)) {
       return null;
     }
 
-    if (liveRunDetailQuery.data) {
-      const liveTask = mapRunSnapshotToMobileTask(liveRunDetailQuery.data, liveRunFilesQuery.data);
-      if (normalizeMobileWorkspaceId(liveTask.workspaceId) === currentWorkspace.id) {
-        return liveTask;
+    if (mappedLiveTask) {
+      if (mappedLiveTask.workspaceId === currentWorkspace.id) {
+        return mappedLiveTask;
       }
     }
 
-    return findVisibleTask(id, currentWorkspace.id);
-  }, [currentWorkspace.id, id, liveRunDetailQuery.data, liveRunDetailQuery.isPending, liveRunFilesQuery.data, liveRunFilesQuery.isPending, liveTaskId]);
-
-  useEffect(() => {
-    if (!id || !task || task.id === id || (liveTaskId && (liveRunDetailQuery.isPending || liveRunFilesQuery.isPending))) {
-      return;
+    if (currentWorkspace.source === "static") {
+      return staticVisibleTask;
     }
 
-    Taro.redirectTo({ url: `/pages/tasks/files?id=${task.id}` });
-  }, [id, liveRunDetailQuery.isPending, liveRunFilesQuery.isPending, liveTaskId, task]);
+    return null;
+  }, [
+    currentWorkspace.id,
+    currentWorkspace.source,
+    liveRunDetailQuery.isPending,
+    liveRunFilesQuery.isPending,
+    liveTaskId,
+    mappedLiveTask,
+    staticVisibleTask,
+  ]);
 
   const [currentPath, setCurrentPath] = useState(task?.pathOptions[0]?.path ?? task?.targetPath ?? "");
   const [inputPath, setInputPath] = useState(task?.pathOptions[0]?.path ?? task?.targetPath ?? "");
   const [selectedFilePath, setSelectedFilePath] = useState(task?.files[0]?.path ?? "");
   const [fileSearch, setFileSearch] = useState("");
+  const [downloadingPath, setDownloadingPath] = useState("");
+  const liveMode = Boolean(task && isLiveTaskId(task.id));
+  const sampleMode = Boolean(task && currentWorkspace.source === "static" && !liveMode);
+  useMobileRecentRecorder(
+    task && liveMode && currentWorkspace.source === "auth"
+      ? {
+          resourceType: "run",
+          runId: task.id,
+          interaction: "resume",
+          sourceSurface: "h5",
+        }
+      : null,
+    currentWorkspace.source === "auth"
+  );
+
+  const liveFileItems = useMemo(() => {
+    if (!task || !liveMode) {
+      return [];
+    }
+
+    return (liveRunFilesQuery.data ?? [])
+      .filter((entry) => !entry.path.endsWith("/"))
+      .map((entry) => ({
+        name: toRelativePath(entry.path, ensureTrailingSlash(task.targetPath)),
+        path: entry.path,
+        meta: `updated ${formatUpdatedAt(entry.updatedAt)} / ${formatFileSize(entry.sizeBytes)}`,
+        status: toLiveFileStatus(entry.kind),
+        helper: toLiveFileHelper(entry.kind),
+      }));
+  }, [liveMode, liveRunFilesQuery.data, task]);
+
+  const pathOptions = useMemo(() => {
+    if (!task) {
+      return [];
+    }
+
+    return liveMode
+      ? buildLivePathOptions(task.targetPath, liveRunFilesQuery.data ?? [])
+      : task.pathOptions;
+  }, [liveMode, liveRunFilesQuery.data, task]);
+
+  const fileItems = useMemo(() => {
+    if (!task) {
+      return [];
+    }
+
+    return liveMode ? liveFileItems : task.files;
+  }, [liveFileItems, liveMode, task]);
 
   useEffect(() => {
     if (!task) {
       return;
     }
 
-    const nextPath = task.pathOptions[0]?.path ?? task.targetPath;
+    const nextPath = pathOptions[0]?.path ?? task.targetPath;
     setCurrentPath(nextPath);
     setInputPath(nextPath);
-    setSelectedFilePath(task.files[0]?.path ?? "");
+    setSelectedFilePath(fileItems[0]?.path ?? "");
     setFileSearch("");
-  }, [task]);
+  }, [fileItems, pathOptions, task]);
 
   const visibleFiles = useMemo(() => {
     if (!task) {
       return [];
     }
 
-    return task.files.filter((item) => currentPath === task.targetPath || item.path.startsWith(currentPath));
-  }, [currentPath, task]);
+    const normalizedCurrentPath = ensureTrailingSlash(currentPath);
+
+    return fileItems.filter(
+      (item) =>
+        normalizedCurrentPath === ensureTrailingSlash(task.targetPath) ||
+        item.path.startsWith(normalizedCurrentPath)
+    );
+  }, [currentPath, fileItems, task]);
 
   const filteredVisibleFiles = useMemo(() => {
     return visibleFiles.filter((item) =>
@@ -147,24 +335,27 @@ export default function TaskFilesPage() {
     return (
       filteredVisibleFiles.find((item) => item.path === selectedFilePath) ??
       visibleFiles.find((item) => item.path === selectedFilePath) ??
-      task.files.find((item) => item.path === selectedFilePath) ??
+      fileItems.find((item) => item.path === selectedFilePath) ??
       filteredVisibleFiles[0] ??
       visibleFiles[0] ??
-      task.files[0] ??
+      fileItems[0] ??
       null
     );
-  }, [filteredVisibleFiles, selectedFilePath, task, visibleFiles]);
+  }, [fileItems, filteredVisibleFiles, selectedFilePath, task, visibleFiles]);
 
   const filePreviewQuery = useQuery({
     enabled: Boolean(task && isLiveTaskId(task.id) && selectedFile?.path),
-    queryKey: ["mobile", "runs", task?.id ?? "", "files", "read", selectedFile?.path ?? ""],
+    queryKey:
+      task && selectedFile?.path
+        ? mobileRunPreviewQueryKey(task.id, selectedFile.path)
+        : ["mobile", "runs", "missing-preview"],
     queryFn: async () => {
       if (!task || !selectedFile?.path) {
         return null;
       }
 
       try {
-        return await mobileRunsApi.readRunFile(task.id, selectedFile.path);
+        return await mobileRunsApi.previewRunFile(task.id, selectedFile.path);
       } catch {
         return null;
       }
@@ -177,20 +368,29 @@ export default function TaskFilesPage() {
       return;
     }
 
-    const url = buildMobileRunFileDownloadUrl(task.id, path);
-
-    if (process.env.TARO_ENV === "h5") {
-      if (typeof window !== "undefined") {
-        window.open(url, "_blank", "noopener,noreferrer");
-      }
-      return;
-    }
-
     try {
+      setDownloadingPath(path);
+      const url = await requestMobileRunFileDownloadUrl(task.id, path);
+
+      if (process.env.TARO_ENV === "h5") {
+        if (typeof window !== "undefined") {
+          window.open(url, "_blank", "noopener,noreferrer");
+        }
+        return;
+      }
+
       await Taro.downloadFile({ url });
       Taro.showToast({ title: "开始下载", icon: "success" });
     } catch {
       Taro.showToast({ title: "下载失败", icon: "none" });
+    } finally {
+      setDownloadingPath("");
+    }
+  }
+
+  function openInlinePreview(url: string) {
+    if (process.env.TARO_ENV === "h5" && typeof window !== "undefined") {
+      window.open(url, "_blank", "noopener,noreferrer");
     }
   }
 
@@ -209,6 +409,27 @@ export default function TaskFilesPage() {
     }
 
     setCurrentPath(normalized);
+  }
+
+  if (!task && routeTaskOutOfScope) {
+    return (
+      <View className="page-shell">
+        <View className="hero-card">
+          <View className="section-title">当前任务文件不属于这个工作区</View>
+          <View className="section-copy">
+            这个文件页链接已经越过当前工作区边界。请先返回任务列表重新选择，或切换到对应工作区后再查看文件。
+          </View>
+          <View className="task-row">
+            <Button className="pill active" onClick={() => Taro.navigateBack()}>
+              返回任务列表
+            </Button>
+            <Button className="pill" onClick={() => Taro.switchTab({ url: "/pages/me/index" })}>
+              切换工作区
+            </Button>
+          </View>
+        </View>
+      </View>
+    );
   }
 
   if (!task && liveTaskId && (liveRunDetailQuery.isPending || liveRunFilesQuery.isPending)) {
@@ -237,7 +458,7 @@ export default function TaskFilesPage() {
   }
 
   return (
-    <View className="page-shell">
+    <View className="page-shell" data-testid="mobile-task-files-page">
       <View className="crumb-row">
         <Button className="crumb-btn" onClick={() => Taro.navigateBack()}>
           返回会话
@@ -245,13 +466,29 @@ export default function TaskFilesPage() {
         <Button className="tab-btn active">文件</Button>
       </View>
 
+      {sampleMode ? (
+        <View className="hero-card">
+          <View className="card-row">
+            <View>
+              <View className="section-title">当前展示样例目录</View>
+              <View className="section-copy">
+                这里保留了路径切换、文件卡片和预览结构，便于继续确认交互。真实下载、预览票据和目录更新只会在 live run 中生效。
+              </View>
+            </View>
+            <View className="pill warn">样例回退</View>
+          </View>
+        </View>
+      ) : null}
+
       <View className="file-card">
         <View className="section-head">
           <View>
             <View className="file-name">当前路径</View>
             <View className="file-meta mono">{currentPath}</View>
           </View>
-          <View className="pill active">{filteredVisibleFiles.length} 个文件</View>
+          <View className={`pill ${sampleMode ? "warn" : "active"}`}>
+            {filteredVisibleFiles.length} 个{sampleMode ? "样例文件" : "文件"}
+          </View>
         </View>
         <View className="pill-row">
           {breadcrumbItems.map((item) => (
@@ -306,23 +543,59 @@ export default function TaskFilesPage() {
             </View>
             <View className="pill-row">
               <View className="pill active">{selectedFile.status}</View>
-              <Button className="path-apply-btn" onClick={() => handleDownload(selectedFile.path)}>
-                下载文件
+              <Button
+                className="path-apply-btn"
+                disabled={sampleMode || downloadingPath === selectedFile.path}
+                onClick={() => handleDownload(selectedFile.path)}
+              >
+                {sampleMode
+                  ? "仅 live run 可下载"
+                  : downloadingPath === selectedFile.path
+                    ? "准备下载中"
+                    : "下载文件"}
               </Button>
             </View>
           </View>
           <View className="muted">{selectedFile.helper}</View>
-          <View className="preview-code">
-            {isLiveTaskId(task.id)
-              ? filePreviewQuery.isPending
-                ? "正在读取文件内容..."
-                : filePreviewQuery.data
-                  ? `${filePreviewQuery.data.content}${
-                      filePreviewQuery.data.truncated ? "\n\n[内容过长，已截断，请下载完整文件。]" : ""
-                    }`
-                  : "当前文件更适合直接下载查看，或者后端尚未返回可预览文本。"
-              : "当前为静态参照数据。接入 live run 后，这里会展示真实的文本预览内容。"}
-          </View>
+          {isLiveTaskId(task.id) ? (
+            filePreviewQuery.isPending ? (
+              <View className="preview-code">正在读取文件内容...</View>
+            ) : filePreviewQuery.data ? (
+              filePreviewQuery.data.mode === "text" ? (
+                <View className="preview-code">
+                  {`${filePreviewQuery.data.content ?? ""}${
+                    filePreviewQuery.data.truncated ? "\n\n[内容过长，已截断，请下载完整文件。]" : ""
+                  }`}
+                </View>
+              ) : filePreviewQuery.data.mode === "image" && filePreviewQuery.data.downloadUrl ? (
+                <View className="preview-media-shell">
+                  <Image
+                    className="preview-image"
+                    src={filePreviewQuery.data.downloadUrl}
+                    mode="widthFix"
+                  />
+                </View>
+              ) : filePreviewQuery.data.mode === "pdf" && filePreviewQuery.data.downloadUrl ? (
+                <View className="preview-link-shell">
+                  <View className="path-helper">当前文件为 PDF，建议在独立窗口中预览或下载。</View>
+                  <Button
+                    className="path-apply-btn"
+                    onClick={() => openInlinePreview(filePreviewQuery.data?.downloadUrl ?? "")}
+                  >
+                    打开 PDF 预览
+                  </Button>
+                </View>
+              ) : (
+                <View className="preview-code">当前文件更适合直接下载查看，或者后端尚未返回可预览内容。</View>
+              )
+            ) : (
+              <View className="preview-code">当前文件更适合直接下载查看，或者后端尚未返回可预览内容。</View>
+            )
+          ) : (
+            <View className="preview-code">
+              当前为样例目录数据。接入 live run 后，这里会展示真实的文本、图片或 PDF 预览，并支持票据化下载。
+            </View>
+          )}
         </View>
       ) : null}
 
@@ -338,7 +611,7 @@ export default function TaskFilesPage() {
         </View>
 
         <View className="path-option-list">
-          {task.pathOptions.map((item) => (
+          {pathOptions.map((item) => (
             <Button
               className={`path-option ${currentPath === item.path ? "active" : ""}`}
               key={item.path}
@@ -363,7 +636,10 @@ export default function TaskFilesPage() {
           </Button>
         </View>
         <View className="path-helper">
-          自定义路径会限制在当前工作区与当前实例目录之内，便于在移动端直接下载任意结果文件。
+          自定义路径会限制在当前工作区与当前实例目录之内。
+          {sampleMode
+            ? " 当前仍是样例目录，仅用于确认路径切换和目录结构交互。"
+            : " 进入真实实例后，可以在这里直接下载当前 target path 下的结果文件。"}
         </View>
       </View>
     </View>

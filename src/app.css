@@ -102,6 +102,129 @@ taro-input-core {
   opacity: 1;
 }
 
+.auth-screen-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  background: rgba(5, 10, 18, 0.72);
+  backdrop-filter: blur(18px);
+}
+
+.auth-screen-shell {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-top: max(20px, env(safe-area-inset-top));
+  padding-bottom: max(24px, env(safe-area-inset-bottom));
+}
+
+.auth-screen-page {
+  width: 100%;
+  gap: 14px;
+}
+
+.auth-screen-card {
+  gap: 14px;
+}
+
+.auth-brand-mark {
+  width: 42px;
+  height: 42px;
+}
+
+.auth-toggle-row {
+  flex-wrap: wrap;
+}
+
+.auth-error-banner {
+  padding: 11px 12px;
+  border: 1px solid color-mix(in srgb, var(--warn) 26%, var(--line));
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--warn-soft) 86%, var(--surface));
+  color: var(--warn);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.auth-submit-btn {
+  width: 100%;
+  min-height: 46px;
+  border-radius: 16px;
+  display: grid;
+  place-items: center;
+  background: var(--accent-soft);
+  border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--line));
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.auth-submit-btn[disabled] {
+  opacity: 0.5;
+}
+
+.auth-helper-grid {
+  grid-template-columns: 1fr;
+}
+
+.auth-helper-card {
+  min-height: 88px;
+  align-content: start;
+}
+
+.message-attachment-list,
+.attachment-draft-list {
+  display: grid;
+  gap: 8px;
+}
+
+.message-attachment-chip,
+.attachment-draft-card {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface-2);
+}
+
+.message-attachment-label,
+.attachment-draft-title {
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+.message-attachment-meta,
+.attachment-draft-meta {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.6;
+  word-break: break-all;
+}
+
+.search-suggestion-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.search-suggestion-chip {
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 11px;
+  line-height: 1;
+}
+
 @media (min-width: 481px) {
   .taro-tabbar__container,
   .taro-tabbar__panel {

@@ -1,6 +1,8 @@
 import type { RunFileEntry, RunSnapshot, RunStatus } from "@lingban/contracts";
+import { resolveRunListTags } from "@lingban/domain-models";
 import type { MobileTask, MobileTaskMessage } from "../data/mobileData";
-import { normalizeMobileWorkspaceId } from "../data/workspaceCatalog";
+import type { MobileWorkspaceView } from "./workspaceContext";
+import { inferMobileWorkspaceContextKey } from "./workspaceContext";
 
 function formatClock(iso: string) {
   const date = new Date(iso);
@@ -20,6 +22,10 @@ function inferWorkshop(taskVersionId: string) {
   if (taskVersionId.includes("drama")) return "短剧生成套件";
   if (taskVersionId.includes("poster")) return "图像资产批处理";
   return "云端实例";
+}
+
+function resolveWorkshop(snapshot: RunSnapshot) {
+  return snapshot.run.catalogMetadata?.workshopName?.zh ?? inferWorkshop(snapshot.run.taskVersionId);
 }
 
 function statusMeta(status: RunStatus) {
@@ -107,7 +113,9 @@ function buildModuleMessages(
         title: "当前实例等待确认",
         summary: "敏感动作和预算相关动作会直接回到当前任务对话，不会脱离同一实例上下文。",
         status: "待确认",
-        items: pendingApprovals.slice(0, 3).map((item) => item.reason || item.title || item.kind),
+        items: pendingApprovals
+          .slice(0, 3)
+          .map((item) => item.note?.trim() || item.prompt.trim()),
         primaryAction: "继续执行",
         primaryDraft: "我已确认当前待审批动作，请继续执行这一轮实例。",
         secondaryAction: "先解释原因",
@@ -179,14 +187,27 @@ export function isLiveTaskId(id: string | undefined) {
   return Boolean(id?.startsWith("run_"));
 }
 
-export function mapRunSnapshotToMobileTask(snapshot: RunSnapshot, liveFiles?: RunFileEntry[]): MobileTask {
+export function mapRunSnapshotToMobileTask(
+  snapshot: RunSnapshot,
+  liveFiles?: RunFileEntry[],
+  currentWorkspace?: MobileWorkspaceView
+): MobileTask {
   const files = liveFiles ?? snapshot.files;
   const status = statusMeta(snapshot.run.status);
-  const normalizedWorkspaceId = normalizeMobileWorkspaceId(snapshot.run.workspaceId);
+  const normalizedWorkspaceId = currentWorkspace?.runtimeWorkspaceId === snapshot.run.workspaceId
+    ? currentWorkspace.id
+    : snapshot.run.catalogMetadata?.workspaceContextKey ??
+      inferMobileWorkspaceContextKey({
+        workspaceId: snapshot.run.workspaceId,
+      });
   const messages: MobileTaskMessage[] = snapshot.messages.map((message) => ({
     role: message.role === "agent" ? "运行实例" : message.role === "user" ? "你" : "系统引导",
     time: formatClock(message.createdAt),
     body: message.text,
+    attachments: message.attachments.map((attachment) => ({
+      label: attachment.label,
+      path: attachment.path,
+    })),
     kind: (message.role === "agent" ? "agent" : message.role === "user" ? "user" : "system") as
       | "system"
       | "user"
@@ -199,20 +220,22 @@ export function mapRunSnapshotToMobileTask(snapshot: RunSnapshot, liveFiles?: Ru
     id: snapshot.run.runId,
     workspaceId: normalizedWorkspaceId,
     title: snapshot.run.title,
-    workshop: inferWorkshop(snapshot.run.taskVersionId),
+    workshop: resolveWorkshop(snapshot),
     status: status.status,
     statusLabel: status.label,
     statusClass: status.className,
     updatedAt: `更新于 ${formatClock(snapshot.run.updatedAt)}`,
     summary: lastMessage?.body ?? snapshot.run.statusReason ?? "实例已建立，等待继续推进。",
-    tags: [`#${snapshot.run.entrySurface}`, `#${snapshot.run.status.toLowerCase()}`, normalizedWorkspaceId],
+    tags: resolveRunListTags(snapshot, {
+      workspaceContextKey: normalizedWorkspaceId,
+    }),
     targetPath: snapshot.run.targetPath,
     container: snapshot.run.runId,
     stage: status.stage,
     eta: snapshot.run.status === "SUCCEEDED" ? "已完成" : "持续运行中",
     approvals: snapshot.approvals.filter((item) => item.state === "pending").length,
     objective: snapshot.run.title,
-    mounted: `${normalizedWorkspaceId} / ${snapshot.run.sessionVersionId}`,
+    mounted: `${snapshot.run.workspaceId} / ${snapshot.run.sessionVersionId}`,
     messages,
     files: files
       .filter((file) => !file.path.endsWith("/"))

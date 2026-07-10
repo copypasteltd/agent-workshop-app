@@ -1,20 +1,84 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button, View } from "@tarojs/components";
 import Taro, { getCurrentInstance } from "@tarojs/taro";
 import { useEffect, useMemo } from "react";
-import { mobileServiceDetailContent } from "../../data/mobileDetailContent";
-import { findVisibleService, getWorkspaceEntry, type MobileWorkspaceId } from "../../data/workspaceCatalog";
-import { mobileRunsApi } from "../../lib/api";
-import { buildMobileRunInput } from "../../lib/runTemplates";
-import { useMobileUiStore } from "../../stores/mobileUiStore";
+import { mobileCatalogApi, mobileRunsApi } from "../../lib/api";
+import {
+  buildMobileServiceConnectorLabels,
+  buildMobileServiceLaunchFlow,
+  buildMobileServiceRiskSummary,
+  mapServiceCatalogEntryToMobileService,
+  resolveMobileEntrySurface,
+} from "../../lib/catalog";
+import { useMobileRecentRecorder } from "../../lib/recent";
+import { useMobileWorkspaceCatalog } from "../../lib/useMobileWorkspaceCatalog";
+import { useResolvedMobileWorkspace } from "../../lib/useMobileWorkspace";
 
 export default function ServiceDetailPage() {
   const queryClient = useQueryClient();
   const id = getCurrentInstance().router?.params?.id;
-  const currentWorkspaceId = useMobileUiStore((state) => state.currentWorkspaceId) as MobileWorkspaceId;
-  const currentWorkspace = getWorkspaceEntry(currentWorkspaceId);
-  const service = useMemo(() => findVisibleService(id, currentWorkspace.id), [currentWorkspace.id, id]);
-  const detailContent = service ? mobileServiceDetailContent[service.id] : null;
+  const currentWorkspace = useResolvedMobileWorkspace();
+  const { visibleServices } = useMobileWorkspaceCatalog(currentWorkspace);
+  const entrySurface = resolveMobileEntrySurface();
+  const serviceQuery = useQuery({
+    queryKey: [
+      "mobile",
+      "catalog",
+      "service",
+      currentWorkspace.selectionId,
+      currentWorkspace.id,
+      entrySurface,
+      id,
+    ],
+    queryFn: async () => {
+      if (!id) {
+        return null;
+      }
+
+      return mobileCatalogApi.getService(id, {
+        workspaceContextKey: currentWorkspace.id,
+        entrySurface,
+      });
+    },
+    enabled: Boolean(id),
+    retry: false,
+    staleTime: 30_000,
+  });
+
+  const fallbackService = useMemo(
+    () => {
+      const matched = visibleServices.find((item) => item.id === id) ?? null;
+      if (matched) {
+        return matched;
+      }
+
+      return currentWorkspace.source === "static" ? visibleServices[0] ?? null : null;
+    },
+    [currentWorkspace.source, id, visibleServices]
+  );
+
+  const service = useMemo(
+    () =>
+      serviceQuery.data
+        ? mapServiceCatalogEntryToMobileService(serviceQuery.data)
+        : fallbackService,
+    [fallbackService, serviceQuery.data]
+  );
+
+  const connectorLabels = useMemo(
+    () => (serviceQuery.data ? buildMobileServiceConnectorLabels(serviceQuery.data) : []),
+    [serviceQuery.data]
+  );
+
+  const launchFlow = useMemo(
+    () => (serviceQuery.data ? buildMobileServiceLaunchFlow(serviceQuery.data) : []),
+    [serviceQuery.data]
+  );
+
+  const riskSummary = useMemo(
+    () => (serviceQuery.data ? buildMobileServiceRiskSummary(serviceQuery.data) : ""),
+    [serviceQuery.data]
+  );
 
   useEffect(() => {
     if (!id || !service || service.id === id) {
@@ -24,22 +88,38 @@ export default function ServiceDetailPage() {
     Taro.redirectTo({ url: `/pages/services/detail?id=${service.id}` });
   }, [id, service]);
 
+  useMobileRecentRecorder(
+    service && currentWorkspace.source === "auth"
+      ? {
+          resourceType: "service",
+          serviceId: service.id,
+          interaction: "open",
+          sourceSurface: entrySurface,
+        }
+      : null,
+    currentWorkspace.source === "auth"
+  );
+
   const launchRunMutation = useMutation({
     mutationFn: async () => {
       if (!service) {
         throw new Error("No visible service for current workspace.");
       }
 
-      const input = buildMobileRunInput(service.id, currentWorkspaceId);
+      const template = await mobileCatalogApi.createLaunchTemplate(service.id, {
+        workspaceContextKey: currentWorkspace.id,
+        workspaceId:
+          currentWorkspace.source === "auth" ? currentWorkspace.runtimeWorkspaceId : undefined,
+        entrySurface,
+      });
 
-      if (!input) {
-        throw new Error(`Missing run template for service ${service.id}`);
-      }
-
-      return mobileRunsApi.createRun(input);
+      return mobileRunsApi.createRun(template.createRunInput);
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["mobile", "runs"] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["mobile", "runs"] }),
+        queryClient.invalidateQueries({ queryKey: ["mobile", "me", "recent"] }),
+      ]);
     },
   });
 
@@ -49,7 +129,9 @@ export default function ServiceDetailPage() {
         <View className="page-section">
           <View className="hero-card">
             <View className="section-title">当前工作区暂无可启动服务</View>
-            <View className="section-copy">切换工作区后再回来，或者回到工坊页选择其他可见服务。</View>
+            <View className="section-copy">
+              切换工作区后再回来，或者回到工坊页选择其他可见服务。
+            </View>
             <Button className="pill active" onClick={() => Taro.switchTab({ url: "/pages/workshops/index" })}>
               返回工坊
             </Button>
@@ -78,14 +160,17 @@ export default function ServiceDetailPage() {
                 {currentWorkspace.name} / 默认目录 {currentWorkspace.root}
               </View>
             </View>
-            <View className="pill success">{currentWorkspace.type}</View>
+            <View className="pill success">
+              {currentWorkspace.type}
+              {currentWorkspace.source === "auth" ? " / 已登录" : ""}
+            </View>
           </View>
           <View className="file-row">
             <View>
               <View className="file-name">授权要求</View>
               <View className="file-meta">{service.auth}</View>
             </View>
-            <View className="pill">启动后补充资料</View>
+            <View className="pill">启动后补全资料</View>
           </View>
           <View className="summary-grid">
             <View className="summary-card">
@@ -94,7 +179,9 @@ export default function ServiceDetailPage() {
             </View>
             <View className="summary-card">
               <View className="summary-label">工作目录</View>
-              <View className="summary-value mono">{currentWorkspace.root}</View>
+              <View className="summary-value mono">
+                {serviceQuery.data?.targetPathHint ?? currentWorkspace.root}
+              </View>
             </View>
           </View>
           <View className="card-row">
@@ -107,25 +194,35 @@ export default function ServiceDetailPage() {
                 try {
                   const created = await launchRunMutation.mutateAsync();
                   Taro.navigateTo({ url: `/pages/tasks/detail?id=${created.run.runId}` });
-                } catch {
-                  Taro.showToast({ title: "创建实例失败", icon: "none" });
+                } catch (error) {
+                  Taro.showToast({
+                    title: error instanceof Error ? "启动失败" : "启动失败",
+                    icon: "none",
+                  });
                 }
               }}
             >
               {launchRunMutation.isPending ? "启动中" : "立即启动"}
             </Button>
           </View>
+          {launchRunMutation.error instanceof Error ? (
+            <View className="section-copy" style={{ marginTop: "12px" }}>
+              {launchRunMutation.error.message}
+            </View>
+          ) : null}
         </View>
       </View>
 
-      {detailContent ? (
+      {serviceQuery.data ? (
         <>
           <View className="page-section">
             <View className="file-card">
               <View className="file-name">Creator 与能力挂载</View>
-              <View className="file-meta">{detailContent.creator}</View>
+              <View className="file-meta">
+                {serviceQuery.data.workshop.ownerLabel.zh} / {serviceQuery.data.displayName.zh}
+              </View>
               <View className="pill-row">
-                {detailContent.connectors.map((item) => (
+                {connectorLabels.map((item) => (
                   <View className="pill" key={item}>
                     {item}
                   </View>
@@ -136,25 +233,19 @@ export default function ServiceDetailPage() {
 
           <View className="page-section">
             <View className="file-card">
-              <View className="file-name">结果样例</View>
-              <View className="pill-row">
-                {detailContent.outputs.map((item) => (
-                  <View className="pill active" key={item}>
-                    {item}
-                  </View>
-                ))}
-              </View>
+              <View className="file-name">结果输出契约</View>
+              <View className="section-copy">{serviceQuery.data.outputContractSummary.zh}</View>
             </View>
             <View className="file-card">
               <View className="file-name">授权与风险边界</View>
-              <View className="section-copy">{detailContent.risk}</View>
+              <View className="section-copy">{riskSummary}</View>
             </View>
           </View>
 
           <View className="page-section">
             <View className="file-card">
               <View className="file-name">启动后流程</View>
-              {detailContent.launchFlow.map((item, index) => (
+              {launchFlow.map((item, index) => (
                 <View className="file-row" key={`${index + 1}-${item}`}>
                   <View>
                     <View className="file-name">步骤 {index + 1}</View>

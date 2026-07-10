@@ -1,9 +1,15 @@
 import { createRunsRealtimeClient, type RunRealtimeConnection } from "@lingban/api-sdk";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
-import { serverRealtimeMessageSchema, type RunSnapshot } from "@lingban/contracts";
+import {
+  type ApproveRunInput,
+  type RunSnapshot,
+  type SendRunMessageInput,
+} from "@lingban/contracts";
 import { applyBridgeEventToRunSnapshot } from "@lingban/domain-models";
 import { mobileApiBaseUrl } from "./api";
+import { mobileRunDetailQueryKey, mobileRunFilesQueryKey } from "./runQueryKeys";
+import { useMobileAuthStore } from "../stores/mobileAuthStore";
 
 function upsertRunSnapshot(list: RunSnapshot[] | undefined, snapshot: RunSnapshot) {
   const current = list ?? [];
@@ -18,12 +24,14 @@ function upsertRunSnapshot(list: RunSnapshot[] | undefined, snapshot: RunSnapsho
 
 const mobileRunsRealtime = createRunsRealtimeClient({
   baseUrl: mobileApiBaseUrl,
+  getAccessToken: () => useMobileAuthStore.getState().tokens?.accessToken,
 });
 
 type MobileRunStreamState = {
   connected: boolean;
   transport: "idle" | "ws" | "sse";
-  sendMessage(text: string): boolean;
+  sendMessage(input: SendRunMessageInput): boolean;
+  approve(input: ApproveRunInput): boolean;
 };
 
 export function useMobileRunStream(runId: string | null, enabled = true) {
@@ -43,81 +51,43 @@ export function useMobileRunStream(runId: string | null, enabled = true) {
     }
 
     const syncSnapshot = (snapshot: RunSnapshot) => {
-      queryClient.setQueryData(["mobile", "runs", runId], snapshot);
+      queryClient.setQueryData(mobileRunDetailQueryKey(runId), snapshot);
       queryClient.setQueryData(["mobile", "runs"], (current: RunSnapshot[] | undefined) =>
         upsertRunSnapshot(current, snapshot)
       );
-      queryClient.setQueryData(["mobile", "runs", runId, "files"], snapshot.files);
+      queryClient.setQueryData(mobileRunFilesQueryKey(runId), snapshot.files);
     };
 
-    if (typeof WebSocket !== "undefined") {
-      const connection = mobileRunsRealtime.connect(runId, {
-        onOpen: () => {
-          setConnected(true);
-          setTransport("ws");
-        },
-        onClose: () => {
-          setConnected(false);
-        },
-        onSnapshot: syncSnapshot,
-        onEvent: (event) => {
-          const current = queryClient.getQueryData<RunSnapshot>(["mobile", "runs", runId]);
-          if (!current) {
-            return;
-          }
-
-          const next = applyBridgeEventToRunSnapshot(current, event);
-          syncSnapshot(next);
-        },
-      });
-
-      connectionRef.current = connection;
-
-      return () => {
-        connection.close();
-        if (connectionRef.current === connection) {
-          connectionRef.current = null;
-        }
+    const connection = mobileRunsRealtime.connect(runId, {
+      onOpen: () => {
+        setConnected(true);
+      },
+      onClose: () => {
         setConnected(false);
         setTransport("idle");
-      };
-    }
+      },
+      onTransport: (nextTransport) => {
+        setTransport(nextTransport);
+      },
+      onSnapshot: syncSnapshot,
+      onEvent: (event) => {
+        const current = queryClient.getQueryData<RunSnapshot>(mobileRunDetailQueryKey(runId));
+        if (!current) {
+          return;
+        }
 
-    if (typeof EventSource === "undefined") {
-      return;
-    }
+        const next = applyBridgeEventToRunSnapshot(current, event);
+        syncSnapshot(next);
+      },
+    });
 
-    setConnected(true);
-    setTransport("sse");
-
-    const source = new EventSource(`${mobileApiBaseUrl}/v1/runs/${runId}/stream`);
-
-    const handleRealtimePayload = (event: MessageEvent<string>) => {
-      const parsed = serverRealtimeMessageSchema.parse(JSON.parse(event.data) as unknown);
-
-      if (parsed.type === "runs.snapshot") {
-        syncSnapshot(parsed.payload);
-        return;
-      }
-
-      if (parsed.type !== "runs.event") {
-        return;
-      }
-
-      const current = queryClient.getQueryData<RunSnapshot>(["mobile", "runs", runId]);
-      if (!current) {
-        return;
-      }
-
-      const next = applyBridgeEventToRunSnapshot(current, parsed.payload);
-      syncSnapshot(next);
-    };
-
-    source.addEventListener("runs.snapshot", handleRealtimePayload as EventListener);
-    source.addEventListener("runs.event", handleRealtimePayload as EventListener);
+    connectionRef.current = connection;
 
     return () => {
-      source.close();
+      connection.close();
+      if (connectionRef.current === connection) {
+        connectionRef.current = null;
+      }
       setConnected(false);
       setTransport("idle");
     };
@@ -126,15 +96,20 @@ export function useMobileRunStream(runId: string | null, enabled = true) {
   return {
     connected,
     transport,
-    sendMessage(text: string) {
+    sendMessage(input: SendRunMessageInput) {
       if (!connectionRef.current?.isOpen()) {
         return false;
       }
 
-      connectionRef.current.sendMessage({
-        text,
-        attachments: [],
-      });
+      connectionRef.current.sendMessage(input);
+      return true;
+    },
+    approve(input: ApproveRunInput) {
+      if (!connectionRef.current?.isOpen()) {
+        return false;
+      }
+
+      connectionRef.current.approve(input);
       return true;
     },
   } satisfies MobileRunStreamState;

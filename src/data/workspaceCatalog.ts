@@ -5,7 +5,7 @@ export type MobileWorkspaceId = "harbor-finance" | "personal" | "brand-lab";
 const workshopVisibility: Record<string, MobileWorkspaceId[]> = {
   "enterprise-tax": ["harbor-finance"],
   "creator-drama": ["personal", "brand-lab"],
-  "brand-content": ["personal", "brand-lab"],
+  "brand-poster-suite": ["personal", "brand-lab"],
 };
 
 const serviceVisibility: Record<string, MobileWorkspaceId[]> = {
@@ -175,6 +175,14 @@ export function getAllStaticTasks() {
   return [...tasks, ...supplementalTasks].map(ensureWorkspaceId);
 }
 
+export function findStaticTaskById(taskId: string | undefined) {
+  if (!taskId) {
+    return null;
+  }
+
+  return getAllStaticTasks().find((item) => item.id === taskId) ?? null;
+}
+
 export function getVisibleTasks(workspaceId: string | undefined) {
   const normalized = normalizeMobileWorkspaceId(workspaceId);
   return getAllStaticTasks().filter((item) => item.workspaceId === normalized);
@@ -195,5 +203,5 @@ export function findVisibleService(serviceId: string | undefined, workspaceId: s
 
 export function findVisibleTask(taskId: string | undefined, workspaceId: string | undefined) {
   const visibleTasks = getVisibleTasks(workspaceId);
-  return visibleTasks.find((item) => item.id === taskId) ?? visibleTasks[0] ?? null;
+  return visibleTasks.find((item) => item.id === taskId) ?? null;
 }

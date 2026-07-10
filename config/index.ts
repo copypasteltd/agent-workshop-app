@@ -3,6 +3,13 @@ import path from "node:path";
 import devConfig from "./dev";
 import prodConfig from "./prod";
 
+const sourceAliases = {
+  "@lingban/api-sdk": path.resolve(__dirname, "../../../packages/api-sdk/src/index.ts"),
+  "@lingban/contracts": path.resolve(__dirname, "../../../packages/contracts/src/index.ts"),
+  "@lingban/domain-models": path.resolve(__dirname, "../../../packages/domain-models/src/index.ts"),
+  "@lingban/ui-tokens": path.resolve(__dirname, "../../../packages/ui-tokens/src/index.ts"),
+};
+
 function alipayTemplateFallbackPlugin() {
   return {
     name: "lingban-alipay-template-fallback",
@@ -25,6 +32,10 @@ function alipayTemplateFallbackPlugin() {
 }
 
 export default defineConfig<"vite">(async (merge) => {
+  // Keep source aliases in development for local iteration, but use built workspace
+  // packages in production builds to reduce cross-package compile pressure.
+  const useSourceAliases =
+    process.env.NODE_ENV === "development" || process.env.LINGBAN_USE_SOURCE_ALIASES === "1";
   const baseConfig: UserConfigExport<"vite"> = {
     projectName: "lingban-mobile",
     date: "2026-7-7",
@@ -38,7 +49,14 @@ export default defineConfig<"vite">(async (merge) => {
     sourceRoot: "src",
     outputRoot: "dist",
     plugins: ["@tarojs/plugin-generator"],
-    defineConstants: {},
+    defineConstants: {
+      "process.env.TARO_APP_API_BASE_URL": JSON.stringify(
+        process.env.TARO_APP_API_BASE_URL ?? ""
+      ),
+      "process.env.TARO_APP_E2E_AUTH_MODE": JSON.stringify(
+        process.env.TARO_APP_E2E_AUTH_MODE ?? ""
+      ),
+    },
     copy: {
       patterns: [],
       options: {},
@@ -48,12 +66,7 @@ export default defineConfig<"vite">(async (merge) => {
       type: "vite",
       vitePlugins: [alipayTemplateFallbackPlugin()],
     },
-    alias: {
-      "@lingban/api-sdk": path.resolve(__dirname, "../../../packages/api-sdk/src/index.ts"),
-      "@lingban/contracts": path.resolve(__dirname, "../../../packages/contracts/src/index.ts"),
-      "@lingban/domain-models": path.resolve(__dirname, "../../../packages/domain-models/src/index.ts"),
-      "@lingban/ui-tokens": path.resolve(__dirname, "../../../packages/ui-tokens/src/index.ts"),
-    },
+    alias: useSourceAliases ? sourceAliases : {},
     mini: {
       postcss: {
         pxtransform: {
