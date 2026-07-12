@@ -6,6 +6,19 @@ type Theme = "dark" | "light";
 const THEME_STORAGE_KEY = "lingban.mobile.theme";
 const WORKSPACE_STORAGE_KEY = "lingban.mobile.workspace";
 const TASK_DRAFTS_STORAGE_KEY = "lingban.mobile.taskDrafts";
+const TASK_OUTBOX_STORAGE_KEY = "lingban.mobile.taskOutbox";
+
+export type MobileOutgoingMessageStatus = "uploading" | "sending" | "syncing" | "failed";
+
+export type MobileOutgoingMessageRecord = {
+  localId: string;
+  taskId: string;
+  text: string;
+  createdAt: string;
+  attachments: Array<{ label: string; path: string }>;
+  status: MobileOutgoingMessageStatus;
+  errorMessage: string | null;
+};
 
 function readStorage(key: string) {
   try {
@@ -60,17 +73,28 @@ function getInitialTaskDrafts() {
   return readJsonStorage<Record<string, string>>(TASK_DRAFTS_STORAGE_KEY, {});
 }
 
+function getInitialTaskOutbox() {
+  return readJsonStorage<Record<string, MobileOutgoingMessageRecord[]>>(
+    TASK_OUTBOX_STORAGE_KEY,
+    {}
+  );
+}
+
 type MobileUiState = {
   theme: Theme;
   currentWorkspaceId: string;
   workspaceSheetOpen: boolean;
   taskDrafts: Record<string, string>;
+  taskOutbox: Record<string, MobileOutgoingMessageRecord[]>;
   setTheme: (theme: Theme) => void;
   toggleTheme: () => void;
   setCurrentWorkspaceId: (id: string) => void;
   setWorkspaceSheetOpen: (open: boolean) => void;
   setTaskDraft: (taskId: string, draft: string) => void;
   clearTaskDraft: (taskId: string) => void;
+  upsertTaskOutboxMessage: (taskId: string, message: MobileOutgoingMessageRecord) => void;
+  removeTaskOutboxMessage: (taskId: string, localId: string) => void;
+  clearTaskOutbox: (taskId: string) => void;
 };
 
 export const useMobileUiStore = create<MobileUiState>((set) => ({
@@ -78,6 +102,7 @@ export const useMobileUiStore = create<MobileUiState>((set) => ({
   currentWorkspaceId: getInitialWorkspaceId(),
   workspaceSheetOpen: false,
   taskDrafts: getInitialTaskDrafts(),
+  taskOutbox: getInitialTaskOutbox(),
   setTheme: (theme) => {
     writeStorage(THEME_STORAGE_KEY, theme);
     set({ theme });
@@ -108,5 +133,40 @@ export const useMobileUiStore = create<MobileUiState>((set) => ({
       delete nextDrafts[taskId];
       writeStorage(TASK_DRAFTS_STORAGE_KEY, JSON.stringify(nextDrafts));
       return { taskDrafts: nextDrafts };
+    }),
+  upsertTaskOutboxMessage: (taskId, message) =>
+    set((state) => {
+      const current = state.taskOutbox[taskId] ?? [];
+      const index = current.findIndex((item) => item.localId === message.localId);
+      const nextTaskMessages =
+        index === -1
+          ? [...current, message]
+          : current.map((item, itemIndex) => (itemIndex === index ? message : item));
+      const nextOutbox = {
+        ...state.taskOutbox,
+        [taskId]: nextTaskMessages.sort((left, right) => left.createdAt.localeCompare(right.createdAt)),
+      };
+      writeStorage(TASK_OUTBOX_STORAGE_KEY, JSON.stringify(nextOutbox));
+      return { taskOutbox: nextOutbox };
+    }),
+  removeTaskOutboxMessage: (taskId, localId) =>
+    set((state) => {
+      const current = state.taskOutbox[taskId] ?? [];
+      const nextTaskMessages = current.filter((item) => item.localId !== localId);
+      const nextOutbox = { ...state.taskOutbox };
+      if (nextTaskMessages.length > 0) {
+        nextOutbox[taskId] = nextTaskMessages;
+      } else {
+        delete nextOutbox[taskId];
+      }
+      writeStorage(TASK_OUTBOX_STORAGE_KEY, JSON.stringify(nextOutbox));
+      return { taskOutbox: nextOutbox };
+    }),
+  clearTaskOutbox: (taskId) =>
+    set((state) => {
+      const nextOutbox = { ...state.taskOutbox };
+      delete nextOutbox[taskId];
+      writeStorage(TASK_OUTBOX_STORAGE_KEY, JSON.stringify(nextOutbox));
+      return { taskOutbox: nextOutbox };
     }),
 }));

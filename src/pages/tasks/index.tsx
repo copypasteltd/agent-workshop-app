@@ -1,5 +1,4 @@
 import { useQuery } from "@tanstack/react-query";
-import { matchesSearchQuery } from "@lingban/domain-models";
 import { Button, Input, View } from "@tarojs/components";
 import Taro from "@tarojs/taro";
 import { useMemo, useState } from "react";
@@ -66,37 +65,12 @@ export default function TasksPage() {
       return filteredLiveTasks;
     }
 
-    if (taskDataMode === "empty") {
-      return [];
-    }
-
-    return combinedTasks.filter((item) => {
-      const statusMatched = statusFilter === "all" || item.status === statusFilter;
-      const tagMatched = tagFilter === "all" || item.tags.includes(tagFilter);
-
-      if (!statusMatched || !tagMatched) {
-        return false;
-      }
-
-      return matchesSearchQuery(searchQuery, [
-        item.id,
-        item.title,
-        item.workshop,
-        item.summary,
-        item.statusLabel,
-        item.updatedAt,
-        item.targetPath,
-        ...item.tags,
-      ]);
-    });
+    return [];
   }, [
     combinedTasks,
     filteredLiveTasks,
     filteredRunsQuery.fetchStatus,
     filteredRunsQuery.isSuccess,
-    searchQuery,
-    statusFilter,
-    tagFilter,
     taskDataMode,
   ]);
 
@@ -110,9 +84,7 @@ export default function TasksPage() {
   const listSummary =
     taskDataMode === "live"
       ? `${filteredTasks.length} live run${filteredTasks.length === 1 ? "" : "s"} in ${currentWorkspace.name}`
-      : taskDataMode === "static"
-        ? `${filteredTasks.length} sample task${filteredTasks.length === 1 ? "" : "s"} in preview mode`
-        : `No continuing runs in ${currentWorkspace.name}`;
+      : `No continuing runs in ${currentWorkspace.name}`;
 
   return (
     <View className="page-shell">
@@ -127,19 +99,7 @@ export default function TasksPage() {
         </View>
 
         <View className="filter-block">
-          {taskDataMode === "static" ? (
-            <View className="file-card">
-              <View className="card-row">
-                <View>
-                  <View className="file-name">Preview task structure</View>
-                  <View className="file-meta">
-                    This workspace is still showing sample tasks so interaction and layout can be reviewed before a real run is started.
-                  </View>
-                </View>
-                <View className="pill warn">preview</View>
-              </View>
-            </View>
-          ) : taskDataMode === "empty" ? (
+          {taskDataMode === "empty" ? (
             <View className="file-card">
               <View className="card-row">
                 <View>
@@ -219,9 +179,7 @@ export default function TasksPage() {
                     {tag}
                   </View>
                 ))}
-                <View className={`pill ${item.id.startsWith("run_") ? "success" : "warn"}`}>
-                  {item.id.startsWith("run_") ? "live" : "sample"}
-                </View>
+                <View className="pill success">live</View>
               </View>
               <View className="card-row">
                 <View className="muted">Open the full task conversation</View>

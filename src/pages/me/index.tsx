@@ -471,7 +471,7 @@ export default function MePage() {
       ? `${summaryTasks.length} 个可继续任务`
       : authDataEnabled
         ? "等待真实任务同步"
-        : "样例目录模式";
+        : "当前暂无可继续任务";
 
   const normalizedVisibleTaskSummary =
     taskDataMode === "empty"
@@ -659,7 +659,7 @@ export default function MePage() {
         entries.push({
           name: item.name,
           detail: item.detail,
-          status: currentWorkspace.source === "static" ? "preview" : item.status,
+          status: item.status,
         });
       }
 
@@ -875,13 +875,7 @@ export default function MePage() {
       });
     }
 
-    if (taskDataMode === "static") {
-      entries.push({
-        title: "当前任务摘要处于样例回退模式",
-        detail:
-          "尚未检测到当前工作区的真实 run 列表。任务页会保留样例结构，资产、待办和结果统计不会计入样例数据。",
-      });
-    } else {
+    {
       const approvalCount = summaryTasks.filter((item) => item.status === "approval").length;
       const runningCount = summaryTasks.filter((item) => item.status === "running").length;
       const doneCount = summaryTasks.filter((item) => item.status === "done").length;

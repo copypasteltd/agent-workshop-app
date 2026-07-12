@@ -21,12 +21,17 @@ export function useResolvedMobileWorkspace() {
 }
 
 export function useAvailableMobileWorkspaces() {
+  const currentWorkspace = useResolvedMobileWorkspace();
   const authMode = useMobileAuthStore((state) => state.authMode);
   const authWorkspaces = useMobileAuthStore((state) => state.workspaces);
 
   return useMemo(
-    () =>
-      listMobileWorkspaceViews(authMode === "required" ? authWorkspaces : undefined),
-    [authMode, authWorkspaces]
+    () => {
+      const authViews = listMobileWorkspaceViews(
+        authMode === "required" ? authWorkspaces : undefined
+      );
+      return authViews.length > 0 ? authViews : [currentWorkspace];
+    },
+    [authMode, authWorkspaces, currentWorkspace]
   );
 }

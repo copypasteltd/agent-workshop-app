@@ -648,6 +648,7 @@ export default function WorkshopsPage() {
                       <View className="section-copy">{item.summary}</View>
                       <Button
                         className="pill active"
+                        data-testid={`mobile-service-open-${item.id}`}
                         onClick={() => Taro.navigateTo({ url: `/pages/services/detail?id=${item.id}` })}
                       >
                         启动

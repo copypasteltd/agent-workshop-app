@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { matchesSearchQuery } from "@lingban/domain-models";
 import { Button, Image, Input, View } from "@tarojs/components";
 import Taro, { getCurrentInstance } from "@tarojs/taro";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import workshopDrama from "../../assets/workshop-drama.svg";
 import workshopImage from "../../assets/workshop-image.svg";
 import workshopTax from "../../assets/workshop-tax.svg";
@@ -14,7 +14,6 @@ import {
   resolveMobileEntrySurface,
 } from "../../lib/catalog";
 import { useMobileRecentRecorder } from "../../lib/recent";
-import { useMobileWorkspaceCatalog } from "../../lib/useMobileWorkspaceCatalog";
 import { useResolvedMobileWorkspace } from "../../lib/useMobileWorkspace";
 
 const workshopCoverMap: Record<string, string> = {
@@ -27,7 +26,6 @@ export default function WorkshopDetailPage() {
   const id = getCurrentInstance().router?.params?.id;
   const [searchQuery, setSearchQuery] = useState("");
   const currentWorkspace = useResolvedMobileWorkspace();
-  const { visibleServices, visibleWorkshops } = useMobileWorkspaceCatalog(currentWorkspace);
   const entrySurface = resolveMobileEntrySurface();
   const workshopQuery = useQuery({
     queryKey: [
@@ -54,34 +52,14 @@ export default function WorkshopDetailPage() {
     staleTime: 30_000,
   });
 
-  const fallbackWorkshop = useMemo(
-    () => {
-      const matched = visibleWorkshops.find((item) => item.id === id) ?? null;
-      if (matched) {
-        return matched;
-      }
-
-      return currentWorkspace.source === "static" ? visibleWorkshops[0] ?? null : null;
-    },
-    [currentWorkspace.source, id, visibleWorkshops]
-  );
-
   const workshop = useMemo(
-    () =>
-      workshopQuery.data
-        ? mapWorkshopCatalogEntryToMobileWorkshop(workshopQuery.data)
-        : fallbackWorkshop,
-    [fallbackWorkshop, workshopQuery.data]
+    () => (workshopQuery.data ? mapWorkshopCatalogEntryToMobileWorkshop(workshopQuery.data) : null),
+    [workshopQuery.data]
   );
 
   const services = useMemo(
-    () =>
-      workshopQuery.data
-        ? workshopQuery.data.services.map(mapServiceCatalogEntryToMobileService)
-        : workshop
-          ? visibleServices.filter((item) => item.workshopId === workshop.id)
-          : [],
-    [visibleServices, workshop, workshopQuery.data]
+    () => (workshopQuery.data ? workshopQuery.data.services.map(mapServiceCatalogEntryToMobileService) : []),
+    [workshopQuery.data]
   );
 
   const launchFlow = useMemo(
@@ -96,14 +74,6 @@ export default function WorkshopDetailPage() {
       ),
     [searchQuery, services]
   );
-
-  useEffect(() => {
-    if (!id || !workshop || workshop.id === id) {
-      return;
-    }
-
-    Taro.redirectTo({ url: `/pages/workshops/detail?id=${workshop.id}` });
-  }, [id, workshop]);
 
   useMobileRecentRecorder(
     workshop && currentWorkspace.source === "auth"

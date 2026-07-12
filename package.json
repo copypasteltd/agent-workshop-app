@@ -2,7 +2,7 @@
   "name": "lingban-mobile",
   "version": "1.0.0",
   "private": true,
-  "description": "灵办词元移动端",
+  "description": "Lingban Workshop mobile app",
   "templateInfo": {
     "name": "default",
     "typescript": true,
@@ -29,6 +29,7 @@
     "@lingban/api-sdk": "workspace:*",
     "@lingban/contracts": "workspace:*",
     "@lingban/domain-models": "workspace:*",
+    "@lingban/realtime": "workspace:*",
     "@lingban/ui-tokens": "workspace:*",
     "@babel/runtime": "^7.24.4",
     "@tarojs/components": "4.2.0",

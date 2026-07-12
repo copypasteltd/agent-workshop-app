@@ -1,13 +1,17 @@
 import { uploadRunAttachment } from "@lingban/api-sdk";
-import type { ApproveRunInput } from "@lingban/contracts";
+import type {
+  ApproveRunInput,
+  ReviewRunInformationAnswerDecision,
+  RunConversationAttachment,
+  RunConversationMessage,
+  RunInformationCollection,
+  SendRunMessageInput,
+} from "@lingban/contracts";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Button, Textarea, View } from "@tarojs/components";
+import { Button, Input, Textarea, View } from "@tarojs/components";
 import Taro, { getCurrentInstance } from "@tarojs/taro";
-import { useMemo, useState } from "react";
-import {
-  findStaticTaskById,
-  findVisibleTask,
-} from "../../data/workspaceCatalog";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { MobileTaskMessage } from "../../data/mobileData";
 import { formatAttachmentSize, pickBrowserAttachments, type BrowserAttachmentDraft } from "../../lib/attachments";
 import {
   billingSourceLabel,
@@ -31,7 +35,11 @@ import { mobileRunDetailQueryKey, mobileRunFilesQueryKey } from "../../lib/runQu
 import { useMobileRecentRecorder } from "../../lib/recent";
 import { useMobileRunStream } from "../../lib/runStream";
 import { useResolvedMobileWorkspace } from "../../lib/useMobileWorkspace";
-import { useMobileUiStore } from "../../stores/mobileUiStore";
+import {
+  useMobileUiStore,
+  type MobileOutgoingMessageRecord,
+  type MobileOutgoingMessageStatus,
+} from "../../stores/mobileUiStore";
 
 function formatQuotaTime(value: string) {
   const date = new Date(value);
@@ -125,15 +133,299 @@ function formatDataVolume(value: number | null) {
   return `${value} B`;
 }
 
+function hasInformationCollectionData(
+  informationCollection: RunInformationCollection | null | undefined
+) {
+  if (!informationCollection) {
+    return false;
+  }
+
+  return (
+    informationCollection.requiredCount > 0 ||
+    informationCollection.satisfiedCount > 0 ||
+    informationCollection.missingCount > 0 ||
+    informationCollection.userMessageCount > 0 ||
+    informationCollection.attachmentCount > 0 ||
+    informationCollection.slotSchemaVersion !== null
+  );
+}
+
+function informationCollectionStatusLabel(
+  status: RunInformationCollection["status"]
+) {
+  switch (status) {
+    case "completed":
+      return "已补齐";
+    case "in_progress":
+      return "补充中";
+    case "pending":
+    default:
+      return "待补充";
+  }
+}
+
+function informationCollectionSlotStatusLabel(
+  status: RunInformationCollection["slots"][number]["status"]
+) {
+  switch (status) {
+    case "satisfied":
+      return "已满足";
+    case "missing":
+      return "缺失";
+    case "optional":
+    default:
+      return "可选";
+  }
+}
+
+function buildInformationCollectionItems(
+  informationCollection: RunInformationCollection
+) {
+  return [...informationCollection.slots]
+    .sort((left, right) => {
+      const leftRank =
+        left.status === "missing" && left.required ? 0 : left.status === "satisfied" ? 2 : 1;
+      const rightRank =
+        right.status === "missing" && right.required ? 0 : right.status === "satisfied" ? 2 : 1;
+      return leftRank - rightRank;
+    })
+    .slice(0, 4)
+    .map((slot) => {
+      const parts = [
+        slot.title,
+        slot.required ? "必填" : "可选",
+        informationCollectionSlotStatusLabel(slot.status),
+      ];
+
+      if (slot.attachmentCount > 0) {
+        parts.push(`附件 ${slot.attachmentCount}`);
+      }
+
+      if (slot.answerCount > 0) {
+        parts.push(`回答 ${slot.answerCount}`);
+      }
+
+      const detail =
+        slot.lastAnswerText?.trim() ||
+        slot.prompt?.trim() ||
+        slot.description?.trim();
+      return detail ? `${parts.join(" / ")} / ${detail}` : parts.join(" / ");
+    });
+}
+
+type InformationCollectionAnswer = RunInformationCollection["answers"][number];
+
+type ReviewableInformationAnswer = InformationCollectionAnswer & {
+  slotTitle: string;
+};
+
+type ReviewFormState = {
+  open: boolean;
+  note: string;
+  replacementValueText: string;
+  replacementAttachmentPath: string;
+  replacementAttachmentLabel: string;
+};
+
+function informationCollectionAnswerReviewStatusLabel(
+  status: InformationCollectionAnswer["reviewStatus"]
+) {
+  switch (status) {
+    case "approved":
+      return "已通过";
+    case "rejected":
+      return "已驳回";
+    case "superseded":
+      return "已替换";
+    case "pending":
+    default:
+      return "待复核";
+  }
+}
+
+function informationCollectionAnswerReviewTone(status: InformationCollectionAnswer["reviewStatus"]) {
+  switch (status) {
+    case "approved":
+      return "success";
+    case "rejected":
+      return "warn";
+    case "superseded":
+      return "";
+    case "pending":
+    default:
+      return "active";
+  }
+}
+
+function informationCollectionAnswerSourceLabel(source: InformationCollectionAnswer["source"]) {
+  switch (source) {
+    case "manual-review":
+      return "人工复核";
+    case "user-message":
+    default:
+      return "用户消息";
+  }
+}
+
+function informationCollectionAnswerPreview(answer: InformationCollectionAnswer) {
+  if (answer.kind === "attachment") {
+    const attachmentLabel = answer.attachmentLabel?.trim();
+    const attachmentPath = answer.attachmentPath?.trim();
+    if (attachmentLabel && attachmentPath) {
+      return `${attachmentLabel} / ${attachmentPath}`;
+    }
+
+    return attachmentLabel || attachmentPath || "附件答案";
+  }
+
+  return answer.valueText?.trim() || "文本答案";
+}
+
+function createDefaultReviewFormState(answer: InformationCollectionAnswer): ReviewFormState {
+  return {
+    open: false,
+    note: answer.reviewNote ?? "",
+    replacementValueText: answer.valueText ?? "",
+    replacementAttachmentPath: answer.attachmentPath ?? "",
+    replacementAttachmentLabel: answer.attachmentLabel ?? "",
+  };
+}
+
+function createEmptyReviewFormState(): ReviewFormState {
+  return {
+    open: false,
+    note: "",
+    replacementValueText: "",
+    replacementAttachmentPath: "",
+    replacementAttachmentLabel: "",
+  };
+}
+
+type DisplayedTaskMessage = MobileTaskMessage & {
+  localId?: string;
+  deliveryStatus?: MobileOutgoingMessageStatus;
+  errorMessage?: string | null;
+};
+
+function formatMessageTime(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return date.toLocaleTimeString("zh-CN", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+}
+
+function nextOutgoingMessageId() {
+  return `msg_local_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function normalizeOutgoingText(value: string) {
+  return value.trim() || "我补充了附件，请读取并继续。";
+}
+
+function deliveryStatusLabel(status: MobileOutgoingMessageStatus) {
+  switch (status) {
+    case "uploading":
+      return "上传中";
+    case "sending":
+      return "发送中";
+    case "syncing":
+      return "同步中";
+    case "failed":
+      return "发送失败";
+    default:
+      return status;
+  }
+}
+
+function deliveryStatusTone(status: MobileOutgoingMessageStatus) {
+  switch (status) {
+    case "failed":
+      return "warn";
+    case "uploading":
+    case "sending":
+    case "syncing":
+      return "active";
+    default:
+      return "";
+  }
+}
+
+function attachmentsEqual(
+  left: RunConversationAttachment[] | Array<{ label: string; path: string }>,
+  right: Array<{ label: string; path: string }>
+) {
+  if (left.length !== right.length) {
+    return false;
+  }
+
+  return right.every(
+    (item, index) => left[index]?.label === item.label && left[index]?.path === item.path
+  );
+}
+
+function snapshotContainsOutgoingMessage(
+  messages: RunConversationMessage[],
+  outgoing: MobileOutgoingMessageRecord
+) {
+  const createdAtValue = Date.parse(outgoing.createdAt);
+  return messages.some((message) => {
+    if (message.role !== "user") {
+      return false;
+    }
+
+    if (message.text !== outgoing.text) {
+      return false;
+    }
+
+    if (!attachmentsEqual(message.attachments, outgoing.attachments)) {
+      return false;
+    }
+
+    const messageCreatedAtValue = Date.parse(message.createdAt);
+    if (!Number.isFinite(createdAtValue) || !Number.isFinite(messageCreatedAtValue)) {
+      return true;
+    }
+
+    return messageCreatedAtValue >= createdAtValue - 5_000;
+  });
+}
+
+function mapOutgoingMessageToDisplay(
+  outgoing: MobileOutgoingMessageRecord
+): DisplayedTaskMessage {
+  return {
+    localId: outgoing.localId,
+    role: "你",
+    time: formatMessageTime(outgoing.createdAt),
+    body: outgoing.text,
+    kind: "user",
+    attachments: outgoing.attachments,
+    deliveryStatus: outgoing.status,
+    errorMessage: outgoing.errorMessage,
+  };
+}
+
 export default function TaskDetailPage() {
   const queryClient = useQueryClient();
   const id = getCurrentInstance().router?.params?.id;
   const liveTaskId = isLiveTaskId(id);
   const taskDrafts = useMobileUiStore((state) => state.taskDrafts);
+  const taskOutbox = useMobileUiStore((state) => state.taskOutbox);
   const setTaskDraft = useMobileUiStore((state) => state.setTaskDraft);
   const clearTaskDraft = useMobileUiStore((state) => state.clearTaskDraft);
+  const upsertTaskOutboxMessage = useMobileUiStore((state) => state.upsertTaskOutboxMessage);
+  const removeTaskOutboxMessage = useMobileUiStore((state) => state.removeTaskOutboxMessage);
   const currentWorkspace = useResolvedMobileWorkspace();
   const runStream = useMobileRunStream(liveTaskId ? id ?? null : null, liveTaskId);
+  const outgoingPayloadsRef = useRef<
+    Record<string, { text: string; drafts: BrowserAttachmentDraft[] }>
+  >({});
 
   const liveTaskQuery = useQuery({
     enabled: liveTaskId,
@@ -156,6 +448,52 @@ export default function TaskDetailPage() {
   const pendingApproval = useMemo(
     () => liveSnapshot?.approvals.find((item) => item.state === "pending") ?? null,
     [liveSnapshot]
+  );
+  const informationCollection = liveSnapshot?.informationCollection ?? null;
+  const informationCollectionVisible = useMemo(
+    () => hasInformationCollectionData(informationCollection),
+    [informationCollection]
+  );
+  const informationCollectionItems = useMemo(
+    () =>
+      informationCollection ? buildInformationCollectionItems(informationCollection) : [],
+    [informationCollection]
+  );
+  const reviewableInformationAnswers = useMemo<ReviewableInformationAnswer[]>(
+    () =>
+      informationCollection
+        ? [...informationCollection.answers]
+            .filter((answer) => answer.reviewStatus !== "superseded")
+            .map((answer) => ({
+              ...answer,
+              slotTitle:
+                informationCollection.slots.find((slot) => slot.key === answer.slotKey)?.title ??
+                answer.slotKey,
+            }))
+            .sort((left, right) => {
+              const rank = (status: ReviewableInformationAnswer["reviewStatus"]) => {
+                switch (status) {
+                  case "pending":
+                    return 0;
+                  case "rejected":
+                    return 1;
+                  case "approved":
+                    return 2;
+                  case "superseded":
+                  default:
+                    return 3;
+                }
+              };
+
+              const rankDiff = rank(left.reviewStatus) - rank(right.reviewStatus);
+              if (rankDiff !== 0) {
+                return rankDiff;
+              }
+
+              return right.createdAt.localeCompare(left.createdAt);
+            })
+        : [],
+    [informationCollection]
   );
   const pendingQuotaApproval = useMemo(
     () => (pendingApproval?.kind === "quota-override" ? pendingApproval : null),
@@ -311,28 +649,13 @@ export default function TaskDetailPage() {
       currentWorkspace
     );
   }, [currentWorkspace, liveTaskQuery.data]);
-  const staticVisibleTask = useMemo(
-    () =>
-      currentWorkspace.source === "static"
-        ? findVisibleTask(id, currentWorkspace.id)
-        : null,
-    [currentWorkspace.id, currentWorkspace.source, id]
-  );
-  const staticTaskAcrossWorkspaces = useMemo(() => findStaticTaskById(id), [id]);
   const routeLiveTaskOutOfScope = Boolean(
     liveTaskId &&
       !liveTaskQuery.isPending &&
       mappedLiveTask &&
       mappedLiveTask.workspaceId !== currentWorkspace.id
   );
-  const routeStaticTaskOutOfScope = Boolean(
-    !liveTaskId &&
-      currentWorkspace.source === "static" &&
-      id &&
-      !staticVisibleTask &&
-      staticTaskAcrossWorkspaces
-  );
-  const routeTaskOutOfScope = routeLiveTaskOutOfScope || routeStaticTaskOutOfScope;
+  const routeTaskOutOfScope = routeLiveTaskOutOfScope;
 
   const task = useMemo(() => {
     if (liveTaskId && liveTaskQuery.isPending) {
@@ -345,29 +668,28 @@ export default function TaskDetailPage() {
       }
     }
 
-    if (currentWorkspace.source === "static") {
-      return staticVisibleTask;
-    }
-
     return null;
   }, [
     currentWorkspace.id,
-    currentWorkspace.source,
     liveTaskId,
     liveTaskQuery.isPending,
     mappedLiveTask,
-    staticVisibleTask,
   ]);
 
   const [summaryOpen, setSummaryOpen] = useState(true);
+  const [reviewError, setReviewError] = useState("");
+  const [reviewFormsByAnswerId, setReviewFormsByAnswerId] = useState<
+    Record<string, ReviewFormState>
+  >({});
   const [attachmentDraftsByTask, setAttachmentDraftsByTask] = useState<
     Record<string, BrowserAttachmentDraft[]>
   >({});
   const draft = task ? taskDrafts[task.id] ?? "" : "";
   const attachmentDrafts = task ? attachmentDraftsByTask[task.id] ?? [] : [];
+  const outgoingMessages = task ? taskOutbox[task.id] ?? [] : [];
+  const hasInFlightOutgoing = outgoingMessages.some((item) => item.status !== "failed");
 
-  const liveMode = Boolean(task && isLiveTaskId(task.id));
-  const sampleMode = Boolean(task && currentWorkspace.source === "static" && !liveMode);
+  const liveMode = Boolean(task);
   useMobileRecentRecorder(
     task && liveMode && currentWorkspace.source === "auth"
       ? {
@@ -400,16 +722,104 @@ export default function TaskDetailPage() {
       return next;
     });
   };
+  const updateReviewForm = (
+    answerId: string,
+    updater: (current: ReviewFormState) => ReviewFormState
+  ) => {
+    setReviewFormsByAnswerId((current) => {
+      const nextCurrent = current[answerId] ?? createEmptyReviewFormState();
+      return {
+        ...current,
+        [answerId]: updater(nextCurrent),
+      };
+    });
+  };
+  const openReviewForm = (answer: ReviewableInformationAnswer) => {
+    setReviewError("");
+    setReviewFormsByAnswerId((current) => ({
+      ...current,
+      [answer.answerId]: {
+        ...(current[answer.answerId] ?? createDefaultReviewFormState(answer)),
+        open: true,
+      },
+    }));
+  };
+  const closeReviewForm = (answer: ReviewableInformationAnswer) => {
+    setReviewFormsByAnswerId((current) => ({
+      ...current,
+      [answer.answerId]: {
+        ...(current[answer.answerId] ?? createDefaultReviewFormState(answer)),
+        open: false,
+      },
+    }));
+  };
+  const rememberOutgoingPayload = (
+    localId: string,
+    payload: { text: string; drafts: BrowserAttachmentDraft[] }
+  ) => {
+    outgoingPayloadsRef.current[localId] = payload;
+  };
+  const forgetOutgoingPayload = (localId: string) => {
+    delete outgoingPayloadsRef.current[localId];
+  };
+  const readCurrentOutboxMessage = (taskId: string, localId: string) =>
+    useMobileUiStore
+      .getState()
+      .taskOutbox[taskId]
+      ?.find((item) => item.localId === localId) ?? null;
+
+  useEffect(() => {
+    if (!task || !liveSnapshot) {
+      return;
+    }
+
+    for (const outgoing of outgoingMessages) {
+      if (outgoing.status === "failed") {
+        continue;
+      }
+
+      if (!snapshotContainsOutgoingMessage(liveSnapshot.messages, outgoing)) {
+        continue;
+      }
+
+      removeTaskOutboxMessage(task.id, outgoing.localId);
+      forgetOutgoingPayload(outgoing.localId);
+    }
+  }, [liveSnapshot, outgoingMessages, removeTaskOutboxMessage, task]);
+
+  useEffect(() => {
+    setReviewError("");
+    setReviewFormsByAnswerId({});
+  }, [task?.id]);
+
+  const displayedMessages = useMemo<DisplayedTaskMessage[]>(() => {
+    if (!task) {
+      return [];
+    }
+
+    return [
+      ...task.messages,
+      ...outgoingMessages.map((item) => mapOutgoingMessageToDisplay(item)),
+    ];
+  }, [outgoingMessages, task]);
 
   const sendMessageMutation = useMutation({
-    mutationFn: async (input: { text: string; drafts: BrowserAttachmentDraft[] }) => {
-      if (!task) {
+    mutationFn: async (input: {
+      localId: string;
+      taskId: string;
+      createdAt: string;
+      text: string;
+      drafts: BrowserAttachmentDraft[];
+    }) => {
+      const activeTaskId = task?.id ?? input.taskId;
+      if (!activeTaskId) {
         throw new Error("Task not found.");
       }
 
+      const normalizedText = normalizeOutgoingText(input.text);
       const attachments = await Promise.all(
         input.drafts.map(async (draftAttachment) =>
-          uploadRunAttachment(mobileRunsApi, task.id, {
+          uploadRunAttachment(mobileRunsApi, activeTaskId, {
             fileName: draftAttachment.file.name,
             contentType: draftAttachment.contentType,
             sizeBytes: draftAttachment.sizeBytes,
@@ -419,35 +829,89 @@ export default function TaskDetailPage() {
         )
       );
 
-      const payload = {
-        text: input.text.trim() || "我补充了附件，请读取并继续。",
+      upsertTaskOutboxMessage(activeTaskId, {
+        localId: input.localId,
+        taskId: activeTaskId,
+        text: normalizedText,
+        createdAt: input.createdAt,
         attachments,
+        status: "sending",
+        errorMessage: null,
+      });
+
+      const payload: SendRunMessageInput = {
+        text: normalizedText,
+        attachments,
+        slotValues: [],
       };
 
-      if (liveMode && runStream.sendMessage(payload)) {
-        return null;
+      if (liveMode && runStream.connected) {
+        await runStream.sendMessageAwaitAck(payload);
+        upsertTaskOutboxMessage(activeTaskId, {
+          localId: input.localId,
+          taskId: activeTaskId,
+          text: normalizedText,
+          createdAt: input.createdAt,
+          attachments,
+          status: "syncing",
+          errorMessage: null,
+        });
+        return {
+          mode: "ws" as const,
+          snapshot: null,
+        };
       }
 
-      return await mobileRunsApi.sendRunMessage(task.id, payload);
+      return {
+        mode: "http" as const,
+        snapshot: await mobileRunsApi.sendRunMessage(activeTaskId, payload),
+      };
     },
-    onSuccess: async () => {
-      if (task) {
-        clearTaskDraft(task.id);
-        clearTaskAttachments(task.id);
+    onSuccess: async (result, variables) => {
+      if (result.mode === "http" && result.snapshot) {
+        queryClient.setQueryData(mobileRunDetailQueryKey(variables.taskId), result.snapshot);
+        queryClient.setQueryData(mobileRunFilesQueryKey(variables.taskId), result.snapshot.files);
+        removeTaskOutboxMessage(variables.taskId, variables.localId);
+        forgetOutgoingPayload(variables.localId);
       }
-      if (!task) {
+
+      const currentDraft = useMobileUiStore.getState().taskDrafts[variables.taskId] ?? "";
+      if (currentDraft === variables.text || (!currentDraft.trim() && !variables.text.trim())) {
+        clearTaskDraft(variables.taskId);
+      }
+      clearTaskAttachments(variables.taskId);
+
+      if (!variables.taskId) {
         return;
       }
 
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["mobile", "runs"] }),
-        queryClient.invalidateQueries({ queryKey: mobileRunDetailQueryKey(task.id) }),
-        queryClient.invalidateQueries({ queryKey: mobileRunFilesQueryKey(task.id) }),
+        queryClient.invalidateQueries({ queryKey: mobileRunDetailQueryKey(variables.taskId) }),
+        queryClient.invalidateQueries({ queryKey: mobileRunFilesQueryKey(variables.taskId) }),
         queryClient.invalidateQueries({ queryKey: ["mobile", "billing"] }),
         queryClient.invalidateQueries({ queryKey: ["mobile", "mcp-calls"] }),
       ]);
     },
-    onError: (error) => {
+    onError: (error, variables) => {
+      const current =
+        readCurrentOutboxMessage(variables.taskId, variables.localId) ?? {
+          localId: variables.localId,
+          taskId: variables.taskId,
+          text: normalizeOutgoingText(variables.text),
+          createdAt: variables.createdAt,
+          attachments: variables.drafts.map((item) => ({
+            label: item.label,
+            path: item.file.name,
+          })),
+          status: "failed" as const,
+          errorMessage: null,
+        };
+      upsertTaskOutboxMessage(variables.taskId, {
+        ...current,
+        status: "failed",
+        errorMessage: error instanceof Error ? error.message : "发送失败",
+      });
       Taro.showToast({
         title: error instanceof Error ? error.message : "发送失败",
         icon: "none",
@@ -461,7 +925,8 @@ export default function TaskDetailPage() {
         throw new Error("Task not found.");
       }
 
-      if (liveMode && runStream.approve(input)) {
+      if (liveMode && runStream.connected) {
+        await runStream.approveAwaitAck(input);
         return null;
       }
 
@@ -489,6 +954,58 @@ export default function TaskDetailPage() {
     },
   });
 
+  const reviewMutation = useMutation({
+    mutationFn: async (input: {
+      answer: ReviewableInformationAnswer;
+      decision: ReviewRunInformationAnswerDecision;
+      note?: string;
+      replacementValueText?: string;
+      replacementAttachmentPath?: string;
+      replacementAttachmentLabel?: string;
+    }) => {
+      if (!task) {
+        throw new Error("Task not found.");
+      }
+
+      return await mobileRunsApi.reviewRunInformationAnswer(task.id, {
+        answerId: input.answer.answerId,
+        decision: input.decision,
+        note: input.note?.trim() || undefined,
+        replacementValueText: input.replacementValueText?.trim() || undefined,
+        replacementAttachmentPath: input.replacementAttachmentPath?.trim() || undefined,
+        replacementAttachmentLabel: input.replacementAttachmentLabel?.trim() || undefined,
+      });
+    },
+    onSuccess: async (snapshot, variables) => {
+      if (!task) {
+        return;
+      }
+
+      queryClient.setQueryData(mobileRunDetailQueryKey(task.id), snapshot);
+      queryClient.setQueryData(mobileRunFilesQueryKey(task.id), snapshot.files);
+      setReviewError("");
+      setReviewFormsByAnswerId((current) => {
+        const next = { ...current };
+        delete next[variables.answer.answerId];
+        return next;
+      });
+
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["mobile", "runs"] }),
+        queryClient.invalidateQueries({ queryKey: mobileRunDetailQueryKey(task.id) }),
+        queryClient.invalidateQueries({ queryKey: mobileRunFilesQueryKey(task.id) }),
+      ]);
+    },
+    onError: (error) => {
+      const message = error instanceof Error ? error.message : "复核提交失败";
+      setReviewError(message);
+      Taro.showToast({
+        title: message,
+        icon: "none",
+      });
+    },
+  });
+
   const handleApprovalDecision = (approved: boolean) => {
     if (!pendingApproval) {
       return;
@@ -499,6 +1016,133 @@ export default function TaskDetailPage() {
       approved,
       note: approved ? "Approved from mobile conversation." : "Rejected from mobile conversation.",
     });
+  };
+
+  const handleQuickReviewDecision = (
+    answer: ReviewableInformationAnswer,
+    decision: Exclude<ReviewRunInformationAnswerDecision, "revise">
+  ) => {
+    setReviewError("");
+    reviewMutation.mutate({
+      answer,
+      decision,
+      note:
+        decision === "approve"
+          ? "Approved from mobile review panel."
+          : "Rejected from mobile review panel.",
+    });
+  };
+
+  const handleRevisionSubmit = (answer: ReviewableInformationAnswer) => {
+    const form = reviewFormsByAnswerId[answer.answerId] ?? createDefaultReviewFormState(answer);
+
+    if (answer.kind === "text" && !form.replacementValueText.trim()) {
+      const message = "文本答案改写必须填写替换内容。";
+      setReviewError(message);
+      Taro.showToast({
+        title: message,
+        icon: "none",
+      });
+      return;
+    }
+
+    if (answer.kind === "attachment" && !form.replacementAttachmentPath.trim()) {
+      const message = "附件答案改写必须填写新的文件路径。";
+      setReviewError(message);
+      Taro.showToast({
+        title: message,
+        icon: "none",
+      });
+      return;
+    }
+
+    setReviewError("");
+    reviewMutation.mutate({
+      answer,
+      decision: "revise",
+      note: form.note,
+      replacementValueText: form.replacementValueText,
+      replacementAttachmentPath: form.replacementAttachmentPath,
+      replacementAttachmentLabel: form.replacementAttachmentLabel,
+    });
+  };
+
+  const queueOutgoingMessage = (text: string, drafts: BrowserAttachmentDraft[]) => {
+    if (!task) {
+      return;
+    }
+
+    const localId = nextOutgoingMessageId();
+    const createdAt = new Date().toISOString();
+    const normalizedText = normalizeOutgoingText(text);
+    upsertTaskOutboxMessage(task.id, {
+      localId,
+      taskId: task.id,
+      text: normalizedText,
+      createdAt,
+      attachments: drafts.map((item) => ({
+        label: item.label,
+        path: item.file.name,
+      })),
+      status: drafts.length > 0 ? "uploading" : "sending",
+      errorMessage: null,
+    });
+    rememberOutgoingPayload(localId, {
+      text,
+      drafts,
+    });
+    sendMessageMutation.mutate({
+      localId,
+      taskId: task.id,
+      createdAt,
+      text,
+      drafts,
+    });
+  };
+
+  const handleRetryOutgoingMessage = (message: MobileOutgoingMessageRecord) => {
+    if (!task || hasInFlightOutgoing || sendMessageMutation.isPending) {
+      return;
+    }
+
+    const remembered = outgoingPayloadsRef.current[message.localId];
+    if (!remembered && message.attachments.length > 0) {
+      setTaskDraft(task.id, message.text);
+      Taro.showToast({
+        title: "已恢复文本，请重新选择附件后发送",
+        icon: "none",
+      });
+      return;
+    }
+
+    const nextCreatedAt = new Date().toISOString();
+    upsertTaskOutboxMessage(task.id, {
+      ...message,
+      createdAt: nextCreatedAt,
+      status: remembered?.drafts.length && remembered.drafts.length > 0 ? "uploading" : "sending",
+      errorMessage: null,
+    });
+    sendMessageMutation.mutate({
+      localId: message.localId,
+      taskId: task.id,
+      createdAt: nextCreatedAt,
+      text: remembered?.text ?? message.text,
+      drafts: remembered?.drafts ?? [],
+    });
+  };
+
+  const handleRestoreOutgoingMessage = (message: MobileOutgoingMessageRecord) => {
+    if (!task) {
+      return;
+    }
+
+    setTaskDraft(task.id, message.text);
+    if (message.attachments.length > 0) {
+      Taro.showToast({
+        title: "文本已恢复，请重新选择附件",
+        icon: "none",
+      });
+    }
   };
 
   if (!task && routeTaskOutOfScope) {
@@ -563,20 +1207,6 @@ export default function TaskDetailPage() {
         </Button>
       </View>
 
-      {sampleMode ? (
-        <View className="hero-card">
-          <View className="card-row">
-            <View>
-              <View className="section-title">当前是样例任务</View>
-              <View className="section-copy">
-                这里保留了任务对话结构、模块卡片和文件入口，便于继续查看交互。发送消息、附件上传和审批回写只会在真实 run 中生效。
-              </View>
-            </View>
-            <View className="pill warn">样例回退</View>
-          </View>
-        </View>
-      ) : null}
-
       <View className={`task-shell ${summaryOpen ? "is-open" : ""}`}>
         <Button className="card-hit task-shell-toggle" onClick={() => setSummaryOpen((value) => !value)}>
           <View className="task-top">
@@ -619,10 +1249,275 @@ export default function TaskDetailPage() {
                 <View className="summary-label">任务标签</View>
                 <View className="summary-value">{task.tags.slice(0, 2).join(" ")}</View>
               </View>
+              {informationCollectionVisible && informationCollection ? (
+                <View className="summary-card">
+                  <View className="summary-label">待补信息</View>
+                  <View className="summary-value">
+                    {informationCollection.missingCount} / {informationCollection.requiredCount}
+                  </View>
+                </View>
+              ) : null}
             </View>
           </View>
         ) : null}
       </View>
+
+      {liveMode && informationCollectionVisible && informationCollection ? (
+        <View className="module-card" data-testid="mobile-task-information-collection">
+          <View className="section-head">
+            <View>
+              <View className="module-title">信息采集</View>
+              <View className="section-copy">{informationCollection.prompt}</View>
+            </View>
+            <View
+              className={`pill ${
+                informationCollection.status === "completed"
+                  ? "success"
+                  : informationCollection.status === "in_progress"
+                    ? "active"
+                    : "warn"
+              }`}
+            >
+              {informationCollectionStatusLabel(informationCollection.status)}
+            </View>
+          </View>
+
+          <View className="summary-grid">
+            <View className="summary-card">
+              <View className="summary-label">必填项</View>
+              <View className="summary-value">{informationCollection.requiredCount}</View>
+            </View>
+            <View className="summary-card">
+              <View className="summary-label">已满足</View>
+              <View className="summary-value">{informationCollection.satisfiedCount}</View>
+            </View>
+            <View className="summary-card">
+              <View className="summary-label">缺失项</View>
+              <View className="summary-value">{informationCollection.missingCount}</View>
+            </View>
+            <View className="summary-card">
+              <View className="summary-label">附件数</View>
+              <View className="summary-value">{informationCollection.attachmentCount}</View>
+            </View>
+          </View>
+
+          {informationCollectionItems.length > 0 ? (
+            <View className="module-list">
+              {informationCollectionItems.map((item) => (
+                <View className="module-item" key={item}>
+                  <View className="status-dot" />
+                  <View className="path-helper">{item}</View>
+                </View>
+              ))}
+            </View>
+          ) : null}
+
+          {reviewableInformationAnswers.length > 0 ? (
+            <View className="review-summary">
+              <View className="section-head">
+                <View>
+                  <View className="module-title">答案复核</View>
+                  <View className="section-copy">
+                    在当前任务内直接复核结构化答案，必要时改写后再继续执行。
+                  </View>
+                </View>
+              </View>
+
+              <View className="pill-row">
+                <View
+                  className="pill active"
+                  data-testid="mobile-task-review-count-pending"
+                >
+                  待复核 {informationCollection.pendingReviewCount}
+                </View>
+                <View
+                  className="pill success"
+                  data-testid="mobile-task-review-count-approved"
+                >
+                  已通过 {informationCollection.approvedReviewCount}
+                </View>
+                <View
+                  className="pill warn"
+                  data-testid="mobile-task-review-count-rejected"
+                >
+                  已驳回 {informationCollection.rejectedReviewCount}
+                </View>
+              </View>
+
+              {reviewError ? <View className="inline-error-banner">{reviewError}</View> : null}
+
+              <View className="module-list">
+                {reviewableInformationAnswers.slice(0, 4).map((answer) => {
+                  const reviewForm =
+                    reviewFormsByAnswerId[answer.answerId] ?? createDefaultReviewFormState(answer);
+
+                  return (
+                    <View
+                      className="review-answer-card"
+                      key={answer.answerId}
+                      data-testid={`mobile-task-review-answer-${answer.answerId}`}
+                    >
+                      <View className="review-answer-head">
+                        <View className="review-answer-main">
+                          <View className="review-answer-title">{answer.slotTitle}</View>
+                          <View className="review-answer-meta">
+                            <View
+                              className={`pill ${informationCollectionAnswerReviewTone(answer.reviewStatus)}`}
+                            >
+                              {informationCollectionAnswerReviewStatusLabel(answer.reviewStatus)}
+                            </View>
+                            <View className="pill">
+                              {informationCollectionAnswerSourceLabel(answer.source)}
+                            </View>
+                          </View>
+                        </View>
+                      </View>
+
+                      <View className="review-answer-preview">
+                        {informationCollectionAnswerPreview(answer)}
+                      </View>
+
+                      {answer.reviewNote ? (
+                        <View className="section-copy">最新备注：{answer.reviewNote}</View>
+                      ) : null}
+
+                      <View className="module-action-row">
+                        <Button
+                          className="pill active"
+                          data-testid={`mobile-task-review-approve-${answer.answerId}`}
+                          disabled={reviewMutation.isPending}
+                          onClick={() => handleQuickReviewDecision(answer, "approve")}
+                        >
+                          通过
+                        </Button>
+                        <Button
+                          className="pill warn"
+                          data-testid={`mobile-task-review-reject-${answer.answerId}`}
+                          disabled={reviewMutation.isPending}
+                          onClick={() => handleQuickReviewDecision(answer, "reject")}
+                        >
+                          驳回
+                        </Button>
+                        <Button
+                          className="pill"
+                          disabled={reviewMutation.isPending}
+                          onClick={() =>
+                            reviewForm.open ? closeReviewForm(answer) : openReviewForm(answer)
+                          }
+                        >
+                          {reviewForm.open ? "收起改写" : "改写"}
+                        </Button>
+                      </View>
+
+                      {reviewForm.open ? (
+                        <View className="review-form">
+                          {answer.kind === "text" ? (
+                            <Textarea
+                              className="composer-box composer-input review-form-textarea"
+                              value={reviewForm.replacementValueText}
+                              maxlength={4000}
+                              placeholder="填写替换后的结构化文本答案"
+                              onInput={(event) =>
+                                updateReviewForm(answer.answerId, (current) => ({
+                                  ...current,
+                                  replacementValueText: event.detail.value,
+                                }))
+                              }
+                            />
+                          ) : (
+                            <View className="review-form-grid">
+                              <View className="path-input-shell">
+                                <Input
+                                  className="path-input mono"
+                                  value={reviewForm.replacementAttachmentPath}
+                                  placeholder="新的文件路径"
+                                  onInput={(event) =>
+                                    updateReviewForm(answer.answerId, (current) => ({
+                                      ...current,
+                                      replacementAttachmentPath: event.detail.value,
+                                    }))
+                                  }
+                                />
+                              </View>
+                              <View className="path-input-shell">
+                                <Input
+                                  className="path-input"
+                                  value={reviewForm.replacementAttachmentLabel}
+                                  placeholder="新的文件标签（可选）"
+                                  onInput={(event) =>
+                                    updateReviewForm(answer.answerId, (current) => ({
+                                      ...current,
+                                      replacementAttachmentLabel: event.detail.value,
+                                    }))
+                                  }
+                                />
+                              </View>
+                            </View>
+                          )}
+
+                          <Textarea
+                            className="composer-box composer-input review-note-input"
+                            value={reviewForm.note}
+                            maxlength={2000}
+                            placeholder="填写复核备注（可选）"
+                            onInput={(event) =>
+                              updateReviewForm(answer.answerId, (current) => ({
+                                ...current,
+                                note: event.detail.value,
+                              }))
+                            }
+                          />
+
+                          <View className="module-action-row">
+                            <Button
+                              className="pill active"
+                              data-testid={`mobile-task-review-submit-${answer.answerId}`}
+                              disabled={reviewMutation.isPending}
+                              onClick={() => handleRevisionSubmit(answer)}
+                            >
+                              {reviewMutation.isPending ? "提交中" : "提交改写"}
+                            </Button>
+                            <Button
+                              className="pill"
+                              disabled={reviewMutation.isPending}
+                              onClick={() => closeReviewForm(answer)}
+                            >
+                              取消
+                            </Button>
+                          </View>
+                        </View>
+                      ) : null}
+                    </View>
+                  );
+                })}
+              </View>
+
+              {reviewableInformationAnswers.length > 4 ? (
+                <View className="review-answer-more">
+                  其余 {reviewableInformationAnswers.length - 4} 条答案仍可在当前任务内继续复核。
+                </View>
+              ) : null}
+            </View>
+          ) : null}
+
+          <View className="module-action-row">
+            <Button
+              className="pill active"
+              onClick={() =>
+                applyInlineDraft("请逐项告诉我当前还缺哪些信息，并按顺序引导我补齐。")
+              }
+            >
+              查看缺口
+            </Button>
+            <Button
+              className="pill"
+              onClick={() => applyInlineDraft(informationCollection.prompt)}
+            >
+              继续引导
+            </Button>
+          </View>
+        </View>
+      ) : null}
 
       {liveMode ? (
         <View className="module-card">
@@ -768,7 +1663,7 @@ export default function TaskDetailPage() {
       ) : null}
 
       {liveMode && pendingApproval ? (
-        <View className="module-card approval">
+        <View className="module-card approval" data-testid="mobile-task-pending-approval">
           <View className="section-head">
             <View>
               <View className="module-title">{approvalHeadline}</View>
@@ -830,6 +1725,7 @@ export default function TaskDetailPage() {
           <View className="module-action-row">
             <Button
               className="pill active"
+              data-testid="mobile-task-approve-button"
               disabled={approvalMutation.isPending}
               onClick={() => handleApprovalDecision(true)}
             >
@@ -837,6 +1733,7 @@ export default function TaskDetailPage() {
             </Button>
             <Button
               className="pill warn"
+              data-testid="mobile-task-reject-button"
               disabled={approvalMutation.isPending}
               onClick={() => handleApprovalDecision(false)}
             >
@@ -844,6 +1741,7 @@ export default function TaskDetailPage() {
             </Button>
             <Button
               className="pill"
+              data-testid="mobile-task-ask-approval"
               onClick={() =>
                 applyInlineDraft(
                   pendingQuotaOverride
@@ -870,8 +1768,8 @@ export default function TaskDetailPage() {
       ) : null}
 
       <View className="thread">
-        {task.messages.map((message, index) => (
-          <View className="message-shell" key={`${message.time}-${index}`}>
+        {displayedMessages.map((message, index) => (
+          <View className="message-shell" key={message.localId ?? `${message.time}-${index}`}>
             <View className={`message-card ${message.kind}`}>
               <View className="message-head">
                 <View className={`avatar ${message.kind}`}>
@@ -883,6 +1781,16 @@ export default function TaskDetailPage() {
                 </View>
               </View>
               <View className="message-body">{message.body}</View>
+              {message.deliveryStatus ? (
+                <View className="message-status-row">
+                  <View className={`pill ${deliveryStatusTone(message.deliveryStatus)}`}>
+                    {deliveryStatusLabel(message.deliveryStatus)}
+                  </View>
+                  {message.errorMessage ? (
+                    <View className="message-status-copy">{message.errorMessage}</View>
+                  ) : null}
+                </View>
+              ) : null}
               {message.attachments?.length ? (
                 <View className="message-attachment-list">
                   {message.attachments.map((attachment) => (
@@ -894,6 +1802,39 @@ export default function TaskDetailPage() {
                 </View>
               ) : null}
             </View>
+            {message.localId && message.deliveryStatus === "failed" ? (
+              <View className="module-action-row">
+                <Button
+                  className="pill active"
+                  data-testid={`mobile-task-retry-${message.localId}`}
+                  disabled={sendMessageMutation.isPending || hasInFlightOutgoing}
+                  onClick={() => {
+                    const outgoing = outgoingMessages.find((item) => item.localId === message.localId);
+                    if (!outgoing) {
+                      return;
+                    }
+
+                    handleRetryOutgoingMessage(outgoing);
+                  }}
+                >
+                  重新发送
+                </Button>
+                <Button
+                  className="pill"
+                  data-testid={`mobile-task-restore-${message.localId}`}
+                  onClick={() => {
+                    const outgoing = outgoingMessages.find((item) => item.localId === message.localId);
+                    if (!outgoing) {
+                      return;
+                    }
+
+                    handleRestoreOutgoingMessage(outgoing);
+                  }}
+                >
+                  恢复到输入框
+                </Button>
+              </View>
+            ) : null}
             {message.module ? (
               <View className={`module-card ${message.module.type}`}>
                 <View className="section-head">
@@ -951,10 +1892,10 @@ export default function TaskDetailPage() {
       </View>
 
       <View className="composer">
-        {liveMode ? (
-          <>
+        <>
             <Textarea
               className="composer-box composer-input"
+              data-testid="mobile-task-composer-input"
               value={draft}
               maxlength={2000}
               placeholder="继续提问、补充材料说明，或者告诉 Codex 下一步要做什么"
@@ -967,9 +1908,13 @@ export default function TaskDetailPage() {
               }}
             />
             {attachmentDrafts.length > 0 ? (
-              <View className="attachment-draft-list">
+              <View className="attachment-draft-list" data-testid="mobile-task-attachment-drafts">
                 {attachmentDrafts.map((attachment) => (
-                  <View className="attachment-draft-card" key={attachment.id}>
+                  <View
+                    className="attachment-draft-card"
+                    data-testid={`mobile-task-attachment-draft-${attachment.id}`}
+                    key={attachment.id}
+                  >
                     <View>
                       <View className="attachment-draft-title">{attachment.label}</View>
                       <View className="attachment-draft-meta">
@@ -979,6 +1924,7 @@ export default function TaskDetailPage() {
                     </View>
                     <Button
                       className="pill warn"
+                      data-testid={`mobile-task-attachment-remove-${attachment.id}`}
                       onClick={() =>
                         setTaskAttachments(
                           task.id,
@@ -996,7 +1942,8 @@ export default function TaskDetailPage() {
               <View className="task-row">
                 <Button
                   className="pill"
-                  disabled={sendMessageMutation.isPending}
+                  data-testid="mobile-task-add-attachments"
+                  disabled={sendMessageMutation.isPending || hasInFlightOutgoing}
                   onClick={async () => {
                     try {
                       const picked = await pickBrowserAttachments({ multiple: true });
@@ -1026,8 +1973,10 @@ export default function TaskDetailPage() {
               </View>
               <Button
                 className="send-btn"
+                data-testid="mobile-task-send-button"
                 disabled={
                   sendMessageMutation.isPending ||
+                  hasInFlightOutgoing ||
                   (!draft.trim() && attachmentDrafts.length === 0)
                 }
                 onClick={() => {
@@ -1035,51 +1984,19 @@ export default function TaskDetailPage() {
                     return;
                   }
 
-                  sendMessageMutation.mutate({
-                    text: draft,
-                    drafts: attachmentDrafts,
-                  });
+                  queueOutgoingMessage(draft, attachmentDrafts);
                 }}
               >
-                {sendMessageMutation.isPending
+                {sendMessageMutation.isPending || hasInFlightOutgoing
                   ? attachmentDrafts.length > 0
                     ? "上传并发送中"
-                    : "发送中"
+                    : "发送处理中"
                   : runStream.connected
                     ? "实时发送"
                     : "发送"}
               </Button>
             </View>
           </>
-        ) : (
-          <>
-            <View className="composer-box">
-              当前页展示的是样例对话结构。要继续发送消息、补充材料或处理审批，需要先从工坊启动一个真实实例。
-            </View>
-            <View className="composer-row">
-              <View className="task-row">
-                <Button
-                  className="pill"
-                  onClick={() => Taro.navigateTo({ url: `/pages/tasks/files?id=${task.id}` })}
-                >
-                  查看文件
-                </Button>
-                <Button
-                  className="pill"
-                  onClick={() => Taro.switchTab({ url: "/pages/workshops/index" })}
-                >
-                  去工坊
-                </Button>
-              </View>
-              <Button
-                className="send-btn"
-                onClick={() => Taro.switchTab({ url: "/pages/workshops/index" })}
-              >
-                启动真实实例
-              </Button>
-            </View>
-          </>
-        )}
       </View>
     </View>
   );

@@ -208,6 +208,19 @@ taro-input-core {
   word-break: break-all;
 }
 
+.message-status-row {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.message-status-copy {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.6;
+  word-break: break-word;
+}
+
 .search-suggestion-row {
   display: flex;
   flex-wrap: wrap;

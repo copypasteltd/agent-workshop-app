@@ -65,16 +65,6 @@ export type MobileService = {
   credentialIds?: string[];
 };
 
-export type MobileWorkspaceEntry = {
-  id: string;
-  name: string;
-  type: string;
-  meta: string;
-  root: string;
-  workshops: number;
-  tasks: number;
-};
-
 export const workshops: MobileWorkshop[] = [
   {
     id: "enterprise-tax",
@@ -447,35 +437,5 @@ export const noticeEntries = [
   {
     title: "短剧工坊额度待确认",
     detail: "确认后继续当前实例，不重新收集材料。",
-  },
-];
-
-export const workspaceEntries: MobileWorkspaceEntry[] = [
-  {
-    id: "harbor-finance",
-    name: "华港财务组",
-    type: "企业",
-    meta: "成员 / 已连接 4 项能力",
-    root: "/workspace/tax-q2/",
-    workshops: 1,
-    tasks: 1,
-  },
-  {
-    id: "personal",
-    name: "个人空间",
-    type: "个人",
-    meta: "个人项目 / 已连接 2 项能力",
-    root: "/workspace/personal/",
-    workshops: 2,
-    tasks: 1,
-  },
-  {
-    id: "brand-lab",
-    name: "品牌内容组",
-    type: "企业",
-    meta: "编辑 / 已连接 3 项能力",
-    root: "/workspace/poster-batch-17/",
-    workshops: 2,
-    tasks: 2,
   },
 ];

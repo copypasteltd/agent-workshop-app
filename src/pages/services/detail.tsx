@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button, View } from "@tarojs/components";
 import Taro, { getCurrentInstance } from "@tarojs/taro";
-import { useEffect, useMemo } from "react";
+import { useMemo } from "react";
 import { mobileCatalogApi, mobileRunsApi } from "../../lib/api";
 import {
   buildMobileServiceConnectorLabels,
@@ -11,14 +11,12 @@ import {
   resolveMobileEntrySurface,
 } from "../../lib/catalog";
 import { useMobileRecentRecorder } from "../../lib/recent";
-import { useMobileWorkspaceCatalog } from "../../lib/useMobileWorkspaceCatalog";
 import { useResolvedMobileWorkspace } from "../../lib/useMobileWorkspace";
 
 export default function ServiceDetailPage() {
   const queryClient = useQueryClient();
   const id = getCurrentInstance().router?.params?.id;
   const currentWorkspace = useResolvedMobileWorkspace();
-  const { visibleServices } = useMobileWorkspaceCatalog(currentWorkspace);
   const entrySurface = resolveMobileEntrySurface();
   const serviceQuery = useQuery({
     queryKey: [
@@ -45,24 +43,9 @@ export default function ServiceDetailPage() {
     staleTime: 30_000,
   });
 
-  const fallbackService = useMemo(
-    () => {
-      const matched = visibleServices.find((item) => item.id === id) ?? null;
-      if (matched) {
-        return matched;
-      }
-
-      return currentWorkspace.source === "static" ? visibleServices[0] ?? null : null;
-    },
-    [currentWorkspace.source, id, visibleServices]
-  );
-
   const service = useMemo(
-    () =>
-      serviceQuery.data
-        ? mapServiceCatalogEntryToMobileService(serviceQuery.data)
-        : fallbackService,
-    [fallbackService, serviceQuery.data]
+    () => (serviceQuery.data ? mapServiceCatalogEntryToMobileService(serviceQuery.data) : null),
+    [serviceQuery.data]
   );
 
   const connectorLabels = useMemo(
@@ -79,14 +62,6 @@ export default function ServiceDetailPage() {
     () => (serviceQuery.data ? buildMobileServiceRiskSummary(serviceQuery.data) : ""),
     [serviceQuery.data]
   );
-
-  useEffect(() => {
-    if (!id || !service || service.id === id) {
-      return;
-    }
-
-    Taro.redirectTo({ url: `/pages/services/detail?id=${service.id}` });
-  }, [id, service]);
 
   useMobileRecentRecorder(
     service && currentWorkspace.source === "auth"
@@ -190,6 +165,7 @@ export default function ServiceDetailPage() {
             </Button>
             <Button
               className="pill active"
+              data-testid="mobile-service-launch-button"
               onClick={async () => {
                 try {
                   const created = await launchRunMutation.mutateAsync();

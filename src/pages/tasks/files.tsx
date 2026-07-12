@@ -4,10 +4,6 @@ import { useQuery } from "@tanstack/react-query";
 import { Button, Image, Input, View } from "@tarojs/components";
 import Taro, { getCurrentInstance } from "@tarojs/taro";
 import { useEffect, useMemo, useState } from "react";
-import {
-  findStaticTaskById,
-  findVisibleTask,
-} from "../../data/workspaceCatalog";
 import { mobileRunsApi, requestMobileRunFileDownloadUrl } from "../../lib/api";
 import { isLiveTaskId, mapRunSnapshotToMobileTask } from "../../lib/liveTaskAdapters";
 import {
@@ -111,6 +107,10 @@ function buildLivePathOptions(targetPath: string, entries: RunFileEntry[]) {
     }));
 }
 
+function toTestIdSegment(value: string) {
+  return value.replace(/[^a-zA-Z0-9_-]+/g, "-").replace(/^-+|-+$/g, "") || "item";
+}
+
 export default function TaskFilesPage() {
   const id = getCurrentInstance().router?.params?.id;
   const liveTaskId = isLiveTaskId(id);
@@ -164,28 +164,13 @@ export default function TaskFilesPage() {
       currentWorkspace
     );
   }, [currentWorkspace, liveRunDetailQuery.data, liveRunFilesQuery.data]);
-  const staticVisibleTask = useMemo(
-    () =>
-      currentWorkspace.source === "static"
-        ? findVisibleTask(id, currentWorkspace.id)
-        : null,
-    [currentWorkspace.id, currentWorkspace.source, id]
-  );
-  const staticTaskAcrossWorkspaces = useMemo(() => findStaticTaskById(id), [id]);
   const routeLiveTaskOutOfScope = Boolean(
     liveTaskId &&
       !(liveRunDetailQuery.isPending || liveRunFilesQuery.isPending) &&
       mappedLiveTask &&
       mappedLiveTask.workspaceId !== currentWorkspace.id
   );
-  const routeStaticTaskOutOfScope = Boolean(
-    !liveTaskId &&
-      currentWorkspace.source === "static" &&
-      id &&
-      !staticVisibleTask &&
-      staticTaskAcrossWorkspaces
-  );
-  const routeTaskOutOfScope = routeLiveTaskOutOfScope || routeStaticTaskOutOfScope;
+  const routeTaskOutOfScope = routeLiveTaskOutOfScope;
 
   const task = useMemo(() => {
     if (liveTaskId && (liveRunDetailQuery.isPending || liveRunFilesQuery.isPending)) {
@@ -198,19 +183,13 @@ export default function TaskFilesPage() {
       }
     }
 
-    if (currentWorkspace.source === "static") {
-      return staticVisibleTask;
-    }
-
     return null;
   }, [
     currentWorkspace.id,
-    currentWorkspace.source,
     liveRunDetailQuery.isPending,
     liveRunFilesQuery.isPending,
     liveTaskId,
     mappedLiveTask,
-    staticVisibleTask,
   ]);
 
   const [currentPath, setCurrentPath] = useState(task?.pathOptions[0]?.path ?? task?.targetPath ?? "");
@@ -218,8 +197,7 @@ export default function TaskFilesPage() {
   const [selectedFilePath, setSelectedFilePath] = useState(task?.files[0]?.path ?? "");
   const [fileSearch, setFileSearch] = useState("");
   const [downloadingPath, setDownloadingPath] = useState("");
-  const liveMode = Boolean(task && isLiveTaskId(task.id));
-  const sampleMode = Boolean(task && currentWorkspace.source === "static" && !liveMode);
+  const liveMode = Boolean(task);
   useMobileRecentRecorder(
     task && liveMode && currentWorkspace.source === "auth"
       ? {
@@ -253,9 +231,7 @@ export default function TaskFilesPage() {
       return [];
     }
 
-    return liveMode
-      ? buildLivePathOptions(task.targetPath, liveRunFilesQuery.data ?? [])
-      : task.pathOptions;
+    return buildLivePathOptions(task.targetPath, liveRunFilesQuery.data ?? []);
   }, [liveMode, liveRunFilesQuery.data, task]);
 
   const fileItems = useMemo(() => {
@@ -263,7 +239,7 @@ export default function TaskFilesPage() {
       return [];
     }
 
-    return liveMode ? liveFileItems : task.files;
+    return liveFileItems;
   }, [liveFileItems, liveMode, task]);
 
   useEffect(() => {
@@ -466,28 +442,16 @@ export default function TaskFilesPage() {
         <Button className="tab-btn active">文件</Button>
       </View>
 
-      {sampleMode ? (
-        <View className="hero-card">
-          <View className="card-row">
-            <View>
-              <View className="section-title">当前展示样例目录</View>
-              <View className="section-copy">
-                这里保留了路径切换、文件卡片和预览结构，便于继续确认交互。真实下载、预览票据和目录更新只会在 live run 中生效。
-              </View>
-            </View>
-            <View className="pill warn">样例回退</View>
-          </View>
-        </View>
-      ) : null}
-
       <View className="file-card">
         <View className="section-head">
           <View>
             <View className="file-name">当前路径</View>
-            <View className="file-meta mono">{currentPath}</View>
+            <View className="file-meta mono" data-testid="mobile-task-files-current-path">
+              {currentPath}
+            </View>
           </View>
-          <View className={`pill ${sampleMode ? "warn" : "active"}`}>
-            {filteredVisibleFiles.length} 个{sampleMode ? "样例文件" : "文件"}
+          <View className="pill active">
+            {filteredVisibleFiles.length} 个文件
           </View>
         </View>
         <View className="pill-row">
@@ -507,6 +471,7 @@ export default function TaskFilesPage() {
         <View className="path-input-shell">
           <Input
             className="path-input mono"
+            data-testid="mobile-task-files-search"
             value={fileSearch}
             placeholder="按文件名 / 路径搜索当前目录"
             onInput={(event) => setFileSearch(event.detail.value)}
@@ -521,6 +486,7 @@ export default function TaskFilesPage() {
         {filteredVisibleFiles.map((item) => (
           <Button
             className={`file-select ${selectedFile?.path === item.path ? "active" : ""}`}
+            data-testid={`mobile-task-file-select-${toTestIdSegment(item.name)}`}
             key={item.path}
             onClick={() => setSelectedFilePath(item.path)}
           >
@@ -535,7 +501,7 @@ export default function TaskFilesPage() {
       </View>
 
       {selectedFile ? (
-        <View className="file-card preview-card">
+        <View className="file-card preview-card" data-testid="mobile-task-file-preview">
           <View className="section-head">
             <View>
               <View className="section-title">文件预览</View>
@@ -545,56 +511,47 @@ export default function TaskFilesPage() {
               <View className="pill active">{selectedFile.status}</View>
               <Button
                 className="path-apply-btn"
-                disabled={sampleMode || downloadingPath === selectedFile.path}
+                data-testid="mobile-task-file-download"
+                disabled={downloadingPath === selectedFile.path}
                 onClick={() => handleDownload(selectedFile.path)}
               >
-                {sampleMode
-                  ? "仅 live run 可下载"
-                  : downloadingPath === selectedFile.path
-                    ? "准备下载中"
-                    : "下载文件"}
+                {downloadingPath === selectedFile.path ? "准备下载中" : "下载文件"}
               </Button>
             </View>
           </View>
           <View className="muted">{selectedFile.helper}</View>
-          {isLiveTaskId(task.id) ? (
-            filePreviewQuery.isPending ? (
-              <View className="preview-code">正在读取文件内容...</View>
-            ) : filePreviewQuery.data ? (
-              filePreviewQuery.data.mode === "text" ? (
-                <View className="preview-code">
-                  {`${filePreviewQuery.data.content ?? ""}${
-                    filePreviewQuery.data.truncated ? "\n\n[内容过长，已截断，请下载完整文件。]" : ""
-                  }`}
-                </View>
-              ) : filePreviewQuery.data.mode === "image" && filePreviewQuery.data.downloadUrl ? (
-                <View className="preview-media-shell">
-                  <Image
-                    className="preview-image"
-                    src={filePreviewQuery.data.downloadUrl}
-                    mode="widthFix"
-                  />
-                </View>
-              ) : filePreviewQuery.data.mode === "pdf" && filePreviewQuery.data.downloadUrl ? (
-                <View className="preview-link-shell">
-                  <View className="path-helper">当前文件为 PDF，建议在独立窗口中预览或下载。</View>
-                  <Button
-                    className="path-apply-btn"
-                    onClick={() => openInlinePreview(filePreviewQuery.data?.downloadUrl ?? "")}
-                  >
-                    打开 PDF 预览
-                  </Button>
-                </View>
-              ) : (
-                <View className="preview-code">当前文件更适合直接下载查看，或者后端尚未返回可预览内容。</View>
-              )
+          {filePreviewQuery.isPending ? (
+            <View className="preview-code">正在读取文件内容...</View>
+          ) : filePreviewQuery.data ? (
+            filePreviewQuery.data.mode === "text" ? (
+              <View className="preview-code">
+                {`${filePreviewQuery.data.content ?? ""}${
+                  filePreviewQuery.data.truncated ? "\n\n[内容过长，已截断，请下载完整文件。]" : ""
+                }`}
+              </View>
+            ) : filePreviewQuery.data.mode === "image" && filePreviewQuery.data.downloadUrl ? (
+              <View className="preview-media-shell">
+                <Image
+                  className="preview-image"
+                  src={filePreviewQuery.data.downloadUrl}
+                  mode="widthFix"
+                />
+              </View>
+            ) : filePreviewQuery.data.mode === "pdf" && filePreviewQuery.data.downloadUrl ? (
+              <View className="preview-link-shell">
+                <View className="path-helper">当前文件为 PDF，建议在独立窗口中预览或下载。</View>
+                <Button
+                  className="path-apply-btn"
+                  onClick={() => openInlinePreview(filePreviewQuery.data?.downloadUrl ?? "")}
+                >
+                  打开 PDF 预览
+                </Button>
+              </View>
             ) : (
               <View className="preview-code">当前文件更适合直接下载查看，或者后端尚未返回可预览内容。</View>
             )
           ) : (
-            <View className="preview-code">
-              当前为样例目录数据。接入 live run 后，这里会展示真实的文本、图片或 PDF 预览，并支持票据化下载。
-            </View>
+            <View className="preview-code">当前文件更适合直接下载查看，或者后端尚未返回可预览内容。</View>
           )}
         </View>
       ) : null}
@@ -636,10 +593,7 @@ export default function TaskFilesPage() {
           </Button>
         </View>
         <View className="path-helper">
-          自定义路径会限制在当前工作区与当前实例目录之内。
-          {sampleMode
-            ? " 当前仍是样例目录，仅用于确认路径切换和目录结构交互。"
-            : " 进入真实实例后，可以在这里直接下载当前 target path 下的结果文件。"}
+          自定义路径会限制在当前工作区与当前实例目录之内。进入真实实例后，可以在这里直接下载当前 target path 下的结果文件。
         </View>
       </View>
     </View>

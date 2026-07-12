@@ -1,7 +1,6 @@
 import { useMemo } from "react";
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 import type { MobileService, MobileTask, MobileWorkshop } from "../data/mobileData";
-import { getVisibleTasks } from "../data/workspaceCatalog";
 import { mobileCatalogApi, mobileMeApi, mobileRunsApi } from "./api";
 import {
   mapServiceCatalogEntryToMobileService,
@@ -15,12 +14,11 @@ type MobileWorkspaceCatalogResult = {
   entrySurface: ReturnType<typeof resolveMobileEntrySurface>;
   visibleWorkshops: MobileWorkshop[];
   visibleServices: MobileService[];
-  staticTasks: MobileTask[];
   liveTasks: MobileTask[];
   combinedTasks: MobileTask[];
   recentTasks: MobileTask[];
   availableTaskTags: string[];
-  taskDataMode: "static" | "live" | "empty";
+  taskDataMode: "live" | "empty";
   metrics: {
     workshops: number;
     services: number;
@@ -39,11 +37,6 @@ export function useMobileWorkspaceCatalog(
   currentWorkspace: MobileWorkspaceView
 ): MobileWorkspaceCatalogResult {
   const entrySurface = resolveMobileEntrySurface();
-  const staticTasks = useMemo(
-    () => getVisibleTasks(currentWorkspace.id),
-    [currentWorkspace.id]
-  );
-
   const workshopsQuery = useQuery({
     queryKey: [
       "mobile",
@@ -142,9 +135,7 @@ export function useMobileWorkspaceCatalog(
       : liveTasks.length > 0;
   const taskDataMode: MobileWorkspaceCatalogResult["taskDataMode"] = hasLiveTaskData
     ? "live"
-    : currentWorkspace.source === "auth"
-      ? "empty"
-      : "static";
+    : "empty";
   const availableTaskTags = useMemo(() => {
     if (taskDataMode === "live" && runsSummaryQuery.data) {
       return runsSummaryQuery.data.byTag
@@ -153,26 +144,13 @@ export function useMobileWorkspaceCatalog(
         .slice(0, 4);
     }
 
-    if (taskDataMode === "empty") {
-      return [];
-    }
-
     return Array.from(
-      new Set(
-        [...(taskDataMode === "live" ? liveTasks : staticTasks)]
-          .flatMap((item) => item.tags)
-          .filter((tag) => tag.startsWith("#"))
-      )
+      new Set(liveTasks.flatMap((item) => item.tags).filter((tag) => tag.startsWith("#")))
     ).slice(0, 4);
-  }, [liveTasks, runsSummaryQuery.data, staticTasks, taskDataMode]);
+  }, [liveTasks, runsSummaryQuery.data, taskDataMode]);
   const combinedTasks = useMemo(
-    () =>
-      taskDataMode === "live"
-        ? liveTasks
-        : taskDataMode === "static"
-          ? staticTasks
-          : [],
-    [liveTasks, staticTasks, taskDataMode]
+    () => (taskDataMode === "live" ? liveTasks : []),
+    [liveTasks, taskDataMode]
   );
   const recentTasks = useMemo(() => {
     const recentRunIds =
@@ -205,7 +183,6 @@ export function useMobileWorkspaceCatalog(
     entrySurface,
     visibleWorkshops,
     visibleServices,
-    staticTasks,
     liveTasks,
     combinedTasks,
     recentTasks,
