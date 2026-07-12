@@ -1,26 +1,40 @@
 # 灵办词元移动端 / Lingban Mobile App
 
-## 概览 / Overview
+## 仓库定位 / Repository Role
 
-本仓库是灵办词元的移动端实现，当前以 H5 首发为主，技术栈固定为 Taro + React。产品定位面向轻度用户，强调看到即用、任务即聊、文件即看。
+本目录是灵办词元的轻量端，当前以 H5 首发，后续继续适配微信小程序与支付宝小程序。目录位于 `app/mobile`，属于拆分分支 `agent-workshop-app`。
 
-This repository contains the Lingban mobile client. The first release target is H5, built with Taro + React. The experience is designed for lightweight users with an instant-use workflow: discover a workshop, start a run, chat with Codex, and inspect files directly on mobile.
+This directory contains the lightweight Lingban client. The first release target is H5, with later specialization for WeChat Mini Program and Alipay Mini Program. It lives at `app/mobile` and is part of the `agent-workshop-app` branch.
 
-## 当前范围 / Current Scope
+## 产品职责 / Product Scope
 
-- 工坊列表、工坊详情、服务详情页
-- 任务列表、任务详情、完整对话页
-- target path 文件浏览与路径切换
-- “我的”页中的个人资料、工作区切换、偏好设置
-- 明暗主题适配
-- H5 优先发布，后续再做微信小程序和支付宝小程序特化
+- 工坊发现、服务详情、立即启动
+- 任务列表、多筛选、多会话入口
+- 任务详情中的完整 Codex 对话
+- 文件浏览、路径切换、下载入口
+- 我的页面、工作区切换、偏好与授权摘要
 
-- Workshop list, workshop detail, and service detail views
-- Task list, task detail, and full conversational run view
-- Target-path file browser with path switching
-- Profile, workspace switching, and preferences under the Me page
-- Light and dark themes
-- H5-first release, with later specialization for WeChat Mini Program and Alipay Mini Program
+## 页面结构 / Page Structure
+
+| 路径 | 作用 |
+| --- | --- |
+| `src/pages/workshops/index.tsx` | 工坊首页 |
+| `src/pages/workshops/detail.tsx` | 工坊详情 |
+| `src/pages/services/detail.tsx` | 服务详情与启动入口 |
+| `src/pages/tasks/index.tsx` | 任务列表、筛选、标签与搜索 |
+| `src/pages/tasks/detail.tsx` | 任务会话页，完整对话模式 |
+| `src/pages/tasks/files.tsx` | 文件列表、路径切换与下载入口 |
+| `src/pages/me/index.tsx` | 我的、工作区切换、偏好与资产摘要 |
+
+## 代码结构 / Code Structure
+
+| 路径 | 作用 | 关键文件 |
+| --- | --- | --- |
+| `src/lib/` | API、catalog、runStream、workspace、theme、quota 适配 | `api.ts`, `runStream.ts`, `useMobileWorkspace.ts` |
+| `src/stores/` | 认证态与 UI 态 | `mobileAuthStore.ts`, `mobileUiStore.ts` |
+| `src/components/` | 认证门面与通用交互组件 | `MobileAuthGate.tsx`, `MobileAuthScreen.tsx` |
+| `src/assets/` | logo、tabbar、工坊插图 | `logo.svg`, `tabbar/*` |
+| `src/styles/` | 样式基线 | `prototype.css`, `app.css` |
 
 ## 技术栈 / Tech Stack
 
@@ -29,53 +43,27 @@ This repository contains the Lingban mobile client. The first release target is 
 - TypeScript
 - Zustand
 - TanStack Query
-- Workspace-shared packages: `@lingban/api-sdk`, `@lingban/contracts`, `@lingban/domain-models`, `@lingban/ui-tokens`
 
-## 目录结构 / Directory Structure
-
-```text
-src/
-  app.tsx
-  app.config.ts
-  pages/
-    workshops/
-    services/
-    tasks/
-    me/
-  stores/
-  lib/
-  data/
-  styles/
-  assets/
-config/
-types/
-```
-
-## 开发命令 / Scripts
+## 开发命令 / Commands
 
 ```bash
-pnpm dev:h5
-pnpm build:h5
-pnpm dev:weapp
-pnpm build:weapp
-pnpm dev:alipay
-pnpm build:alipay
+pnpm -C app/mobile dev:h5
+pnpm -C app/mobile build:h5
+pnpm -C app/mobile dev:weapp
+pnpm -C app/mobile build:weapp
+pnpm -C app/mobile dev:alipay
+pnpm -C app/mobile build:alipay
+pnpm -C app/mobile typecheck
 ```
 
-## 开发约束 / Development Notes
+## 交互约束 / Interaction Rules
 
-- H5 是当前默认验证入口
-- 页面信息架构以 `工坊 / 任务 / 我的` 为主导航
-- 任务页必须保持完整对话模式
-- 参数补全依赖运行时对话引导，不在任务初始化阶段硬编码收集
+- 默认导航为 `工坊 / 任务 / 我的`
+- 任务页承载多任务列表，点入后进入具体会话
+- 参数收集在实例化后由 Codex 首轮追问引导完成
+- 文件查看页必须支持路径选择、路径输入与即时切换
+- 工作区选择入口位于“我的”页面
 
-- H5 is the primary validation target
-- The primary navigation model is `Workshops / Tasks / Me`
-- The task page must stay in full conversational mode
-- Input completion is guided at runtime through conversation rather than hard-coded at task creation time
+## 当前状态 / Current Status
 
-## 状态 / Status
-
-当前仓库已完成高保真原型向 Taro 工程的落位，后续会继续接入真实 API、实时订阅、文件下载和运行控制。
-
-The repository already contains the production-oriented Taro application shell derived from the approved prototype. The next steps are real API integration, realtime subscriptions, file download, and run control.
+当前代码已经完成基于定稿原型的 Taro 工程落位，并具备工坊、任务、文件、我的四类核心页面。后续重点是接入真实 run 数据流、下载链路、凭证授权与多端环境差异处理。
