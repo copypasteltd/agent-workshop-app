@@ -1,8 +1,9 @@
+import { ApiError } from "@lingban/api-sdk";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Button, View } from "@tarojs/components";
+import { Button, Input, View } from "@tarojs/components";
 import Taro, { getCurrentInstance } from "@tarojs/taro";
-import { useMemo } from "react";
-import { mobileCatalogApi, mobileRunsApi } from "../../lib/api";
+import { useEffect, useMemo, useState } from "react";
+import { mobileCatalogApi, mobileProvidersApi, mobileRunsApi } from "../../lib/api";
 import {
   buildMobileServiceConnectorLabels,
   buildMobileServiceLaunchFlow,
@@ -12,12 +13,43 @@ import {
 } from "../../lib/catalog";
 import { useMobileRecentRecorder } from "../../lib/recent";
 import { useResolvedMobileWorkspace } from "../../lib/useMobileWorkspace";
+import { hasAuthoritativeMobileWorkspaceContext } from "../../lib/workspaceContext";
+
+function resolveMissingCredentialIds(error: unknown) {
+  if (!(error instanceof ApiError) || error.code !== "CREDENTIAL_REQUIREMENT_UNMET") {
+    return [];
+  }
+
+  const details =
+    typeof error.details === "object" && error.details !== null
+      ? (error.details as { missingCredentialIds?: unknown })
+      : null;
+
+  return Array.isArray(details?.missingCredentialIds)
+    ? details.missingCredentialIds.filter((item): item is string => typeof item === "string")
+    : [];
+}
+
+type LaunchProviderOption = {
+  bindingId: string;
+  providerId: string;
+  providerLabel: string;
+  isDefault: boolean;
+  priority: number;
+  allowUserOverride: boolean;
+  allowCustomModel: boolean;
+  defaultModel: string;
+  models: string[];
+};
 
 export default function ServiceDetailPage() {
   const queryClient = useQueryClient();
   const id = getCurrentInstance().router?.params?.id;
   const currentWorkspace = useResolvedMobileWorkspace();
+  const workspaceDataReady = hasAuthoritativeMobileWorkspaceContext(currentWorkspace);
   const entrySurface = resolveMobileEntrySurface();
+  const [launchProviderBindingId, setLaunchProviderBindingId] = useState("__default__");
+  const [launchProviderModel, setLaunchProviderModel] = useState("");
   const serviceQuery = useQuery({
     queryKey: [
       "mobile",
@@ -38,7 +70,21 @@ export default function ServiceDetailPage() {
         entrySurface,
       });
     },
-    enabled: Boolean(id),
+    enabled: workspaceDataReady && Boolean(id),
+    retry: false,
+    staleTime: 30_000,
+  });
+  const providerBindingsQuery = useQuery({
+    queryKey: ["mobile", "launch-provider-bindings", currentWorkspace.selectionId, currentWorkspace.id],
+    queryFn: async () => mobileProvidersApi.listBindings({ enabled: true }),
+    enabled: workspaceDataReady,
+    retry: false,
+    staleTime: 30_000,
+  });
+  const providerProfilesQuery = useQuery({
+    queryKey: ["mobile", "launch-provider-profiles", currentWorkspace.selectionId, currentWorkspace.id],
+    queryFn: async () => mobileProvidersApi.listProviders({ enabled: true }),
+    enabled: workspaceDataReady,
     retry: false,
     staleTime: 30_000,
   });
@@ -47,6 +93,81 @@ export default function ServiceDetailPage() {
     () => (serviceQuery.data ? mapServiceCatalogEntryToMobileService(serviceQuery.data) : null),
     [serviceQuery.data]
   );
+  const providerProfileLookup = useMemo(
+    () => new Map((providerProfilesQuery.data ?? []).map((provider) => [provider.providerId, provider])),
+    [providerProfilesQuery.data]
+  );
+  const launchProviderOptions = useMemo<LaunchProviderOption[]>(
+    () =>
+      (providerBindingsQuery.data ?? [])
+        .map((binding) => {
+          const provider = providerProfileLookup.get(binding.providerId);
+          if (!provider || !binding.enabled || !provider.enabled) {
+            return null;
+          }
+
+          return {
+            bindingId: binding.bindingId,
+            providerId: provider.providerId,
+            providerLabel: provider.displayName,
+            isDefault: binding.isDefault,
+            priority: binding.priority,
+            allowUserOverride: binding.allowUserOverride,
+            allowCustomModel: provider.allowCustomModel,
+            defaultModel: provider.defaultModel,
+            models: provider.models.filter((item) => item.enabled).map((item) => item.model),
+          } satisfies LaunchProviderOption;
+        })
+        .filter((item): item is LaunchProviderOption => item != null)
+        .sort((left, right) => {
+          if (left.isDefault !== right.isDefault) {
+            return left.isDefault ? -1 : 1;
+          }
+          if (left.priority !== right.priority) {
+            return left.priority - right.priority;
+          }
+          return left.providerLabel.localeCompare(right.providerLabel);
+        }),
+    [providerBindingsQuery.data, providerProfileLookup]
+  );
+  const defaultLaunchProvider = useMemo(
+    () => launchProviderOptions.find((option) => option.isDefault) ?? launchProviderOptions[0] ?? null,
+    [launchProviderOptions]
+  );
+  const selectedLaunchProvider = useMemo(() => {
+    if (launchProviderBindingId === "__default__") {
+      return defaultLaunchProvider;
+    }
+
+    return launchProviderOptions.find((option) => option.bindingId === launchProviderBindingId) ?? null;
+  }, [defaultLaunchProvider, launchProviderBindingId, launchProviderOptions]);
+  const launchProviderSummary = useMemo(() => {
+    if (!selectedLaunchProvider) {
+      return "";
+    }
+
+    const allowedModels =
+      selectedLaunchProvider.models.length > 0
+        ? selectedLaunchProvider.models.join(", ")
+        : selectedLaunchProvider.defaultModel;
+    return `当前路由 ${selectedLaunchProvider.providerLabel} / 默认模型 ${selectedLaunchProvider.defaultModel} / 优先级 ${selectedLaunchProvider.priority} / 可选模型 ${allowedModels}`;
+  }, [selectedLaunchProvider]);
+  const launchProviderOverrideHelp = useMemo(() => {
+    if (!selectedLaunchProvider || !selectedLaunchProvider.allowUserOverride) {
+      return "";
+    }
+
+    if (selectedLaunchProvider.allowCustomModel) {
+      return "该路由允许直接输入任意模型名，留空则继续使用默认模型。";
+    }
+
+    return `该路由仅允许以下模型：${selectedLaunchProvider.models.join(", ") || selectedLaunchProvider.defaultModel}`;
+  }, [selectedLaunchProvider]);
+
+  useEffect(() => {
+    setLaunchProviderBindingId("__default__");
+    setLaunchProviderModel("");
+  }, [currentWorkspace.id, service?.id]);
 
   const connectorLabels = useMemo(
     () => (serviceQuery.data ? buildMobileServiceConnectorLabels(serviceQuery.data) : []),
@@ -80,6 +201,9 @@ export default function ServiceDetailPage() {
       if (!service) {
         throw new Error("No visible service for current workspace.");
       }
+      if (!workspaceDataReady) {
+        throw new Error("Workspace context is not ready yet.");
+      }
 
       const template = await mobileCatalogApi.createLaunchTemplate(service.id, {
         workspaceContextKey: currentWorkspace.id,
@@ -88,7 +212,20 @@ export default function ServiceDetailPage() {
         entrySurface,
       });
 
-      return mobileRunsApi.createRun(template.createRunInput);
+      const trimmedModel = launchProviderModel.trim();
+      const shouldPinExplicitProvider = launchProviderBindingId !== "__default__" && selectedLaunchProvider;
+      const shouldOverrideModel = Boolean(trimmedModel && selectedLaunchProvider?.allowUserOverride);
+
+      return mobileRunsApi.createRun({
+        ...template.createRunInput,
+        providerSelection:
+          shouldPinExplicitProvider || shouldOverrideModel
+            ? {
+                providerId: selectedLaunchProvider!.providerId,
+                ...(shouldOverrideModel ? { model: trimmedModel } : {}),
+              }
+            : null,
+      });
     },
     onSuccess: async () => {
       await Promise.all([
@@ -97,6 +234,26 @@ export default function ServiceDetailPage() {
       ]);
     },
   });
+  const launchMissingCredentialIds = resolveMissingCredentialIds(launchRunMutation.error);
+
+  if (!workspaceDataReady) {
+    return (
+      <View className="page-shell">
+        <View className="page-section">
+          <View className="hero-card">
+            <View className="section-title">Waiting for workspace context</View>
+            <View className="section-copy">
+              Restore the current workspace session first, then reopen this service to load only
+              formal catalog data.
+            </View>
+            <Button className="pill active" onClick={() => Taro.switchTab({ url: "/pages/workshops/index" })}>
+              Return to Workshop
+            </Button>
+          </View>
+        </View>
+      </View>
+    );
+  }
 
   if (!service) {
     return (
@@ -147,6 +304,61 @@ export default function ServiceDetailPage() {
             </View>
             <View className="pill">启动后补全资料</View>
           </View>
+          <View className="file-card" style={{ marginTop: "14px" }}>
+            <View className="file-name">Provider 路由</View>
+            {launchProviderOptions.length > 0 ? (
+              <>
+                <View className="pill-row" style={{ marginTop: "10px" }}>
+                  <Button
+                    className={launchProviderBindingId === "__default__" ? "pill active" : "pill"}
+                    onClick={() => setLaunchProviderBindingId("__default__")}
+                  >
+                    {defaultLaunchProvider
+                      ? `工作区默认 / ${defaultLaunchProvider.providerLabel}`
+                      : "工作区默认"}
+                  </Button>
+                  {launchProviderOptions.map((option) => (
+                    <Button
+                      key={option.bindingId}
+                      className={launchProviderBindingId === option.bindingId ? "pill active" : "pill"}
+                      onClick={() => setLaunchProviderBindingId(option.bindingId)}
+                    >
+                      {option.providerLabel}
+                    </Button>
+                  ))}
+                </View>
+                {launchProviderSummary ? (
+                  <View className="section-copy" style={{ marginTop: "10px" }}>
+                    {launchProviderSummary}
+                  </View>
+                ) : null}
+                {selectedLaunchProvider?.allowUserOverride ? (
+                  <>
+                    <Input
+                      className="composer-input"
+                      style={{ marginTop: "10px" }}
+                      value={launchProviderModel}
+                      onInput={(event) => setLaunchProviderModel(event.detail.value)}
+                      placeholder="留空使用默认模型；填写后按该模型启动"
+                    />
+                    {launchProviderOverrideHelp ? (
+                      <View className="section-copy" style={{ marginTop: "8px" }}>
+                        {launchProviderOverrideHelp}
+                      </View>
+                    ) : null}
+                  </>
+                ) : (
+                  <View className="section-copy" style={{ marginTop: "10px" }}>
+                    当前路由锁定默认模型，启动时不会接受模型覆盖。
+                  </View>
+                )}
+              </>
+            ) : (
+              <View className="section-copy" style={{ marginTop: "10px" }}>
+                当前工作区尚未绑定任何 Provider。实例会继续按既有默认运行时配置启动。
+              </View>
+            )}
+          </View>
           <View className="summary-grid">
             <View className="summary-card">
               <View className="summary-label">当前空间</View>
@@ -171,8 +383,15 @@ export default function ServiceDetailPage() {
                   const created = await launchRunMutation.mutateAsync();
                   Taro.navigateTo({ url: `/pages/tasks/detail?id=${created.run.runId}` });
                 } catch (error) {
+                  const missingCredentialIds = resolveMissingCredentialIds(error);
+                  const message =
+                    missingCredentialIds.length > 0
+                      ? "缺少凭证配置"
+                      : error instanceof Error
+                        ? error.message
+                        : "启动失败";
                   Taro.showToast({
-                    title: error instanceof Error ? "启动失败" : "启动失败",
+                    title: message.slice(0, 20),
                     icon: "none",
                   });
                 }
@@ -182,9 +401,16 @@ export default function ServiceDetailPage() {
             </Button>
           </View>
           {launchRunMutation.error instanceof Error ? (
-            <View className="section-copy" style={{ marginTop: "12px" }}>
-              {launchRunMutation.error.message}
-            </View>
+            launchMissingCredentialIds.length > 0 ? (
+              <View className="section-copy" style={{ marginTop: "12px" }}>
+                缺少必需凭证：
+                {launchMissingCredentialIds.join(" / ")}
+              </View>
+            ) : (
+              <View className="section-copy" style={{ marginTop: "12px" }}>
+                {launchRunMutation.error.message}
+              </View>
+            )
           ) : null}
         </View>
       </View>

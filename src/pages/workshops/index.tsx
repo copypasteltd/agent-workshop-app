@@ -79,13 +79,15 @@ export default function WorkshopsPage() {
     visibleServices,
     recentTasks,
     metrics,
+    workspaceDataReady,
     workshopsQuery,
     servicesQuery,
   } = useMobileWorkspaceCatalog(currentWorkspace);
   const catalogError = workshopsQuery.error ?? servicesQuery.error;
   const remoteSearchEnabled =
-    currentWorkspace.source === "auth" && deferredSearchQuery.length > 0;
-  const remoteSearchExperience = currentWorkspace.source === "auth" && trimmedSearchQuery.length > 0;
+    workspaceDataReady && currentWorkspace.source === "auth" && deferredSearchQuery.length > 0;
+  const remoteSearchExperience =
+    workspaceDataReady && currentWorkspace.source === "auth" && trimmedSearchQuery.length > 0;
 
   const favoriteWorkshopsQuery = useQuery({
     queryKey: ["mobile", "me", "favorites", currentWorkspace.selectionId, currentWorkspace.id],
@@ -283,7 +285,9 @@ export default function WorkshopsPage() {
   const showWorkshops = surfaceFilter === "all" || surfaceFilter === "workshops";
   const showServices = surfaceFilter === "all" || surfaceFilter === "services";
   const showTasks = surfaceFilter === "all" || surfaceFilter === "tasks";
-  const toolbarSummary = remoteSearchExperience
+  const toolbarSummary = !workspaceDataReady
+    ? "Waiting for the current workspace context before loading the workshop catalog."
+    : remoteSearchExperience
     ? searchResultsQuery.isLoading && !searchResultsQuery.data
       ? "正在查询当前工作区内的工坊、服务与任务。"
       : searchResultsQuery.error
@@ -374,6 +378,18 @@ export default function WorkshopsPage() {
             </View>
           </View>
         </View>
+
+        {!workspaceDataReady ? (
+          <View className="page-section">
+            <View className="empty-state">
+              <View className="section-title">Waiting for workspace context</View>
+              <View className="empty-copy">
+                The workshop shelf stays paused until the app restores an authoritative workspace
+                context from the backend session.
+              </View>
+            </View>
+          </View>
+        ) : null}
 
         {!trimmedSearchQuery && searchHistoryItems.length > 0 ? (
           <View className="page-section">

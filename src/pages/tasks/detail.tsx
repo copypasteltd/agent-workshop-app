@@ -1213,7 +1213,7 @@ export default function TaskDetailPage() {
             <View className="task-main">
               <View className="task-shell-title">{task.title}</View>
               <View className="task-shell-meta">
-                工坊：{task.workshop} / 空间：{currentWorkspace.name} / 实例：{task.container}
+                工坊：{task.workshop} / 空间：{currentWorkspace.name} / 实例：{task.runRef}
               </View>
             </View>
             <View className="task-toggle">
@@ -1238,8 +1238,12 @@ export default function TaskDetailPage() {
                 <View className="summary-value">{task.objective}</View>
               </View>
               <View className="summary-card">
-                <View className="summary-label">挂载能力</View>
-                <View className="summary-value">{task.mounted}</View>
+                <View className="summary-label">运行元数据</View>
+                <View className="summary-value">{task.runtimeSummary}</View>
+              </View>
+              <View className="summary-card">
+                <View className="summary-label">Provider 路由</View>
+                <View className="summary-value">{task.providerSummary}</View>
               </View>
               <View className="summary-card">
                 <View className="summary-label">工作目录</View>

@@ -15,6 +15,7 @@ import {
 } from "../../lib/catalog";
 import { useMobileRecentRecorder } from "../../lib/recent";
 import { useResolvedMobileWorkspace } from "../../lib/useMobileWorkspace";
+import { hasAuthoritativeMobileWorkspaceContext } from "../../lib/workspaceContext";
 
 const workshopCoverMap: Record<string, string> = {
   "enterprise-tax": workshopTax,
@@ -26,6 +27,7 @@ export default function WorkshopDetailPage() {
   const id = getCurrentInstance().router?.params?.id;
   const [searchQuery, setSearchQuery] = useState("");
   const currentWorkspace = useResolvedMobileWorkspace();
+  const workspaceDataReady = hasAuthoritativeMobileWorkspaceContext(currentWorkspace);
   const entrySurface = resolveMobileEntrySurface();
   const workshopQuery = useQuery({
     queryKey: [
@@ -47,7 +49,7 @@ export default function WorkshopDetailPage() {
         entrySurface,
       });
     },
-    enabled: Boolean(id),
+    enabled: workspaceDataReady && Boolean(id),
     retry: false,
     staleTime: 30_000,
   });
@@ -86,6 +88,23 @@ export default function WorkshopDetailPage() {
       : null,
     currentWorkspace.source === "auth"
   );
+
+  if (!workspaceDataReady) {
+    return (
+      <View className="page-shell">
+        <View className="hero-card">
+          <View className="section-title">Waiting for workspace context</View>
+          <View className="section-copy">
+            Restore the current workspace session first, then reopen this workshop to load only
+            formal catalog data.
+          </View>
+          <Button className="pill active" onClick={() => Taro.switchTab({ url: "/pages/workshops/index" })}>
+            Return to Workshop
+          </Button>
+        </View>
+      </View>
+    );
+  }
 
   if (!workshop) {
     return (

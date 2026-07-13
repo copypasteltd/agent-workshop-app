@@ -1,19 +1,25 @@
 import Taro from "@tarojs/taro";
 import type {
+  AuthDisabledSessionBootstrap,
   AuthSessionEnvelope,
   AuthSessionResponse,
   AuthTokenPair,
+  WorkspaceContextSummary,
 } from "@lingban/contracts";
 import { create } from "zustand";
 
 type MobileAuthMode = "unknown" | "disabled" | "required";
+type MobileBootstrapWorkspace =
+  | AuthSessionEnvelope["currentWorkspace"]
+  | WorkspaceContextSummary;
 
 type PersistedMobileAuthState = {
   tokens: AuthTokenPair | null;
   user: AuthSessionEnvelope["user"] | null;
   session: AuthSessionEnvelope["session"] | null;
-  currentWorkspace: AuthSessionEnvelope["currentWorkspace"] | null;
-  workspaces: AuthSessionEnvelope["workspaces"];
+  currentWorkspace: MobileBootstrapWorkspace | null;
+  workspaces: MobileBootstrapWorkspace[];
+  platformAccess: AuthSessionEnvelope["platformAccess"] | null;
 };
 
 type MobileAuthState = PersistedMobileAuthState & {
@@ -26,6 +32,7 @@ type MobileAuthState = PersistedMobileAuthState & {
   setLastError: (lastError: string | null) => void;
   applySessionResponse: (response: AuthSessionResponse) => void;
   applySessionEnvelope: (envelope: AuthSessionEnvelope) => void;
+  applyPublicWorkspaceBootstrap: (bootstrap: AuthDisabledSessionBootstrap) => void;
   clearAuth: (lastError?: string | null) => void;
 };
 
@@ -37,6 +44,7 @@ const EMPTY_AUTH_STATE: PersistedMobileAuthState = {
   session: null,
   currentWorkspace: null,
   workspaces: [],
+  platformAccess: null,
 };
 
 function readStorage(key: string) {
@@ -90,6 +98,7 @@ function readPersistedState(): PersistedMobileAuthState {
       session: parsed.session ?? null,
       currentWorkspace: parsed.currentWorkspace ?? null,
       workspaces: Array.isArray(parsed.workspaces) ? parsed.workspaces : [],
+      platformAccess: parsed.platformAccess ?? null,
     };
   } catch {
     return EMPTY_AUTH_STATE;
@@ -106,6 +115,7 @@ function toPersistedState(input: {
     session: input.envelope.session,
     currentWorkspace: input.envelope.currentWorkspace,
     workspaces: input.envelope.workspaces,
+    platformAccess: input.envelope.platformAccess,
   };
 }
 
@@ -144,6 +154,18 @@ export const useMobileAuthStore = create<MobileAuthState>((set, get) => ({
       ...persisted,
       authMode: "required",
       authenticated: Boolean(persisted.tokens?.accessToken),
+      bootstrapping: false,
+      lastError: null,
+    });
+  },
+  applyPublicWorkspaceBootstrap: (bootstrap) => {
+    removeStorage(AUTH_STORAGE_KEY);
+    set({
+      ...EMPTY_AUTH_STATE,
+      currentWorkspace: bootstrap.currentWorkspace,
+      workspaces: bootstrap.workspaces,
+      authMode: "disabled",
+      authenticated: false,
       bootstrapping: false,
       lastError: null,
     });

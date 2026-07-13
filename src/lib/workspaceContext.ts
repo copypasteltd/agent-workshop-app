@@ -1,6 +1,7 @@
-import type { WorkspaceSummary } from "@lingban/contracts";
+import type { WorkspaceContextSummary, WorkspaceSummary } from "@lingban/contracts";
 
 export type MobileWorkspaceContextKey = string;
+export type MobileWorkspaceBootstrap = WorkspaceSummary | WorkspaceContextSummary;
 
 export type MobileWorkspaceView = {
   id: string;
@@ -13,42 +14,37 @@ export type MobileWorkspaceView = {
   contextKey: string;
   selectionId: string;
   runtimeWorkspaceId: string;
-  source: "static" | "auth";
+  source: "static" | "public" | "auth";
   slug: string | null;
   role: WorkspaceSummary["role"] | null;
   membershipStatus: WorkspaceSummary["membershipStatus"] | null;
   authType: WorkspaceSummary["type"] | null;
 };
 
+export function hasAuthoritativeMobileWorkspaceContext(
+  workspace: MobileWorkspaceView
+) {
+  return workspace.source === "auth" || workspace.source === "public";
+}
+
 function normalizeText(value?: string | null) {
   return (value ?? "").trim().toLowerCase();
 }
 
-function previewWorkspaceName(contextKey: string) {
-  switch (contextKey) {
-    case "personal":
-      return "个人空间";
-    case "harbor-finance":
-      return "华港财务组";
-    case "brand-lab":
-      return "品牌内容组";
-    default:
-      return "预览工作区";
-  }
+function previewWorkspaceName() {
+  return "未连接工作区";
 }
 
-function previewWorkspaceType(contextKey: string) {
-  return contextKey === "personal" ? "个人" : "企业";
+function previewWorkspaceType() {
+  return "未连接";
 }
 
 function previewWorkspaceMeta() {
-  return "预览工作区 / 登录后加载真实数据";
+  return "等待会话或目录上下文";
 }
 
-function buildPreviewWorkspaceRoot(contextKey: string) {
-  const normalized =
-    normalizeText(contextKey).replace(/[^a-z0-9-]+/g, "-") || "preview";
-  return `/workspace/${normalized}/`;
+function buildPreviewWorkspaceRoot() {
+  return "/workspace/";
 }
 
 function toWorkspaceTypeLabel(type: WorkspaceSummary["type"]) {
@@ -77,6 +73,29 @@ function toWorkspaceRoleLabel(role: WorkspaceSummary["role"]) {
     default:
       return "查看者";
   }
+}
+
+function isCatalogWorkspaceContext(
+  workspace: MobileWorkspaceBootstrap
+): workspace is WorkspaceContextSummary {
+  return "runtimeWorkspaceId" in workspace && "displayName" in workspace;
+}
+
+function matchesWorkspaceSelection(
+  workspace: MobileWorkspaceBootstrap,
+  selectionId: string
+) {
+  if (isCatalogWorkspaceContext(workspace)) {
+    return (
+      workspace.contextKey === selectionId ||
+      workspace.runtimeWorkspaceId === selectionId
+    );
+  }
+
+  return (
+    workspace.workspaceId === selectionId ||
+    resolveAuthWorkspaceContextKey(workspace) === selectionId
+  );
 }
 
 export function inferMobileWorkspaceContextKey(input: {
@@ -108,13 +127,11 @@ export function inferMobileWorkspaceContextKey(input: {
     normalizeText(input.slug).replace(/[^a-z0-9-]+/g, "-") ||
     normalizeText(input.name).replace(/[^a-z0-9-]+/g, "-") ||
     input.workspaceId ||
-    "harbor-finance"
+    "workspace"
   );
 }
 
-function resolveWorkspaceRoot(
-  workspace: WorkspaceSummary
-) {
+function resolveWorkspaceRoot(workspace: WorkspaceSummary) {
   if (workspace.root) {
     return workspace.root;
   }
@@ -123,10 +140,6 @@ function resolveWorkspaceRoot(
     normalizeText(workspace.slug).replace(/[^a-z0-9-]+/g, "-") ||
     normalizeText(workspace.name).replace(/[^a-z0-9-]+/g, "-") ||
     workspace.workspaceId;
-
-  if (workspace.type === "personal") {
-    return `/workspace/${normalizedSlug}/`;
-  }
 
   return `/workspace/${normalizedSlug}/`;
 }
@@ -143,28 +156,47 @@ function resolveAuthWorkspaceContextKey(workspace: WorkspaceSummary) {
 export function buildPreviewMobileWorkspaceView(
   selectionId?: string | null
 ): MobileWorkspaceView {
-  const contextKey = inferMobileWorkspaceContextKey({
-    workspaceId: selectionId,
-    slug: selectionId,
-    name: selectionId,
-  });
-  const effectiveSelectionId = selectionId?.trim() || contextKey;
+  const normalizedSelection =
+    normalizeText(selectionId).replace(/[^a-z0-9-]+/g, "-") || "workspace";
+
   return {
-    id: contextKey,
-    name: previewWorkspaceName(contextKey),
-    type: previewWorkspaceType(contextKey),
+    id: normalizedSelection,
+    name: previewWorkspaceName(),
+    type: previewWorkspaceType(),
     meta: previewWorkspaceMeta(),
-    root: buildPreviewWorkspaceRoot(contextKey),
+    root: buildPreviewWorkspaceRoot(),
     workshops: 0,
     tasks: 0,
-    contextKey,
-    selectionId: effectiveSelectionId,
-    runtimeWorkspaceId: effectiveSelectionId,
+    contextKey: normalizedSelection,
+    selectionId: selectionId?.trim() || normalizedSelection,
+    runtimeWorkspaceId: selectionId?.trim() || normalizedSelection,
     source: "static",
     slug: null,
     role: null,
     membershipStatus: null,
     authType: null,
+  };
+}
+
+export function buildMobileWorkspaceViewFromCatalogContext(
+  workspace: WorkspaceContextSummary
+): MobileWorkspaceView {
+  return {
+    id: workspace.contextKey,
+    name: workspace.displayName.zh,
+    type: toWorkspaceTypeLabel(workspace.type),
+    meta: workspace.meta.zh,
+    root: workspace.root,
+    workshops: 0,
+    tasks: 0,
+    contextKey: workspace.contextKey,
+    selectionId: workspace.contextKey,
+    runtimeWorkspaceId: workspace.runtimeWorkspaceId,
+    source: "public",
+    slug: workspace.contextKey,
+    role: null,
+    membershipStatus: null,
+    authType: workspace.type,
   };
 }
 
@@ -194,9 +226,15 @@ export function buildMobileWorkspaceViewFromAuth(
   };
 }
 
-export function listMobileWorkspaceViews(workspaces?: WorkspaceSummary[]) {
+function buildMobileWorkspaceView(workspace: MobileWorkspaceBootstrap) {
+  return isCatalogWorkspaceContext(workspace)
+    ? buildMobileWorkspaceViewFromCatalogContext(workspace)
+    : buildMobileWorkspaceViewFromAuth(workspace);
+}
+
+export function listMobileWorkspaceViews(workspaces?: MobileWorkspaceBootstrap[]) {
   if (workspaces && workspaces.length > 0) {
-    return workspaces.map(buildMobileWorkspaceViewFromAuth);
+    return workspaces.map(buildMobileWorkspaceView);
   }
 
   return [];
@@ -204,39 +242,27 @@ export function listMobileWorkspaceViews(workspaces?: WorkspaceSummary[]) {
 
 export function resolveMobileWorkspaceView(input: {
   selectionId?: string | null;
-  workspaces?: WorkspaceSummary[];
-  fallbackWorkspaceId?: string | null;
+  workspaces?: MobileWorkspaceBootstrap[];
+  fallbackWorkspace?: MobileWorkspaceBootstrap | null;
 }) {
-  const { selectionId, workspaces, fallbackWorkspaceId } = input;
+  const { selectionId, workspaces, fallbackWorkspace } = input;
 
   if (workspaces && workspaces.length > 0) {
     const exactMatch = selectionId
-      ? workspaces.find((workspace) => workspace.workspaceId === selectionId)
-      : null;
-    if (exactMatch) {
-      return buildMobileWorkspaceViewFromAuth(exactMatch);
-    }
-
-    const contextMatch = selectionId
-      ? workspaces.find(
-          (workspace) => resolveAuthWorkspaceContextKey(workspace) === selectionId
+      ? workspaces.find((workspace) =>
+          matchesWorkspaceSelection(workspace, selectionId)
         )
       : null;
-    if (contextMatch) {
-      return buildMobileWorkspaceViewFromAuth(contextMatch);
+    if (exactMatch) {
+      return buildMobileWorkspaceView(exactMatch);
     }
 
-    const fallbackMatch = fallbackWorkspaceId
-      ? workspaces.find((workspace) => workspace.workspaceId === fallbackWorkspaceId)
-      : null;
-    if (fallbackMatch) {
-      return buildMobileWorkspaceViewFromAuth(fallbackMatch);
+    if (fallbackWorkspace) {
+      return buildMobileWorkspaceView(fallbackWorkspace);
     }
 
-    return buildMobileWorkspaceViewFromAuth(workspaces[0]);
+    return buildMobileWorkspaceView(workspaces[0]);
   }
 
-  return buildPreviewMobileWorkspaceView(
-    selectionId ?? fallbackWorkspaceId ?? "harbor-finance"
-  );
+  return buildPreviewMobileWorkspaceView(selectionId ?? null);
 }

@@ -2,7 +2,6 @@ import type { RunFileEntry, RunSnapshot, RunStatus } from "@lingban/contracts";
 import { resolveRunListTags } from "@lingban/domain-models";
 import type { MobileTask, MobileTaskMessage } from "../data/mobileData";
 import type { MobileWorkspaceView } from "./workspaceContext";
-import { inferMobileWorkspaceContextKey } from "./workspaceContext";
 
 function formatClock(iso: string) {
   const date = new Date(iso);
@@ -17,15 +16,13 @@ function formatClock(iso: string) {
   });
 }
 
-function inferWorkshop(taskVersionId: string) {
-  if (taskVersionId.includes("tax")) return "企业报税执行器";
-  if (taskVersionId.includes("drama")) return "短剧生成套件";
-  if (taskVersionId.includes("poster")) return "图像资产批处理";
-  return "云端实例";
-}
-
 function resolveWorkshop(snapshot: RunSnapshot) {
-  return snapshot.run.catalogMetadata?.workshopName?.zh ?? inferWorkshop(snapshot.run.taskVersionId);
+  return (
+    snapshot.run.catalogMetadata?.workshopName?.zh ??
+    snapshot.run.catalogMetadata?.workshopId ??
+    snapshot.run.taskVersionId ??
+    "未标注工坊"
+  );
 }
 
 function statusMeta(status: RunStatus) {
@@ -183,6 +180,36 @@ function buildModuleMessages(
   return nextMessages;
 }
 
+function runtimeLaunchModeLabel(value: RunSnapshot["runtime"]["launchMode"]) {
+  switch (value) {
+    case "local-process":
+      return "宿主进程";
+    case "docker":
+      return "容器";
+    default:
+      return null;
+  }
+}
+
+function buildRuntimeSummary(snapshot: RunSnapshot) {
+  const launchMode = runtimeLaunchModeLabel(snapshot.runtime.launchMode);
+  const containerName = snapshot.runtime.containerName?.trim() || null;
+
+  if (launchMode && containerName) {
+    return `${launchMode} / ${containerName}`;
+  }
+
+  if (containerName) {
+    return containerName;
+  }
+
+  if (launchMode) {
+    return launchMode;
+  }
+
+  return "未上报";
+}
+
 export function isLiveTaskId(id: string | undefined) {
   return Boolean(id?.startsWith("run_"));
 }
@@ -197,9 +224,7 @@ export function mapRunSnapshotToMobileTask(
   const normalizedWorkspaceId = currentWorkspace?.runtimeWorkspaceId === snapshot.run.workspaceId
     ? currentWorkspace.id
     : snapshot.run.catalogMetadata?.workspaceContextKey ??
-      inferMobileWorkspaceContextKey({
-        workspaceId: snapshot.run.workspaceId,
-      });
+      snapshot.run.workspaceId;
   const messages: MobileTaskMessage[] = snapshot.messages.map((message) => ({
     role: message.role === "agent" ? "运行实例" : message.role === "user" ? "你" : "系统引导",
     time: formatClock(message.createdAt),
@@ -230,12 +255,15 @@ export function mapRunSnapshotToMobileTask(
       workspaceContextKey: normalizedWorkspaceId,
     }),
     targetPath: snapshot.run.targetPath,
-    container: snapshot.run.runId,
+    runRef: snapshot.run.runId,
     stage: status.stage,
     eta: snapshot.run.status === "SUCCEEDED" ? "已完成" : "持续运行中",
     approvals: snapshot.approvals.filter((item) => item.state === "pending").length,
     objective: snapshot.run.title,
-    mounted: `${snapshot.run.workspaceId} / ${snapshot.run.sessionVersionId}`,
+    runtimeSummary: buildRuntimeSummary(snapshot),
+    providerSummary: snapshot.provider
+      ? `${snapshot.provider.displayName} / ${snapshot.provider.model}`
+      : "未解析 Provider",
     messages,
     files: files
       .filter((file) => !file.path.endsWith("/"))

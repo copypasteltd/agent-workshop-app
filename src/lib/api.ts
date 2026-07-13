@@ -12,6 +12,16 @@ import {
   createSessionRefreshFetch,
   createWorkshopCatalogApiClient,
 } from "@lingban/api-sdk";
+import {
+  listProvidersQuerySchema,
+  listWorkspaceProviderBindingsQuerySchema,
+  providerProfileSchema,
+  workspaceProviderBindingSchema,
+  type ListProvidersQuery,
+  type ListWorkspaceProviderBindingsQuery,
+  type ProviderProfile,
+  type WorkspaceProviderBinding,
+} from "@lingban/contracts";
 import { useMobileAuthStore } from "../stores/mobileAuthStore";
 
 export const mobileApiBaseUrl =
@@ -98,6 +108,59 @@ export const mobileQuotaApi = createQuotaApiClient({
   fetcher: mobileAuthFetch,
   getAccessToken: getMobileAccessToken,
 });
+
+async function requestMobileJson(input: {
+  path: string;
+  method?: string;
+  body?: unknown;
+}) {
+  const response = await mobileAuthFetch(new URL(input.path, mobileApiBaseUrl), {
+    method: input.method ?? "GET",
+    headers: input.body ? { "content-type": "application/json" } : undefined,
+    body: input.body ? JSON.stringify(input.body) : undefined,
+  });
+  const text = await response.text();
+  if (!response.ok) {
+    throw new Error(text || `Request failed: ${response.status}`);
+  }
+
+  return text ? JSON.parse(text) : null;
+}
+
+function buildQueryString(query?: Record<string, string | boolean | undefined>) {
+  const search = new URLSearchParams();
+  for (const [key, value] of Object.entries(query ?? {})) {
+    if (value === undefined) {
+      continue;
+    }
+    search.set(key, String(value));
+  }
+
+  const raw = search.toString();
+  return raw.length > 0 ? `?${raw}` : "";
+}
+
+export const mobileProvidersApi = {
+  async listProviders(query?: ListProvidersQuery) {
+    const parsed = listProvidersQuerySchema.parse(query ?? {});
+    const result = await requestMobileJson({
+      path: `/v1/providers${buildQueryString({
+        enabled: parsed.enabled,
+      })}`,
+    });
+    return providerProfileSchema.array().parse(result) as ProviderProfile[];
+  },
+  async listBindings(query?: ListWorkspaceProviderBindingsQuery) {
+    const parsed = listWorkspaceProviderBindingsQuerySchema.parse(query ?? {});
+    const result = await requestMobileJson({
+      path: `/v1/provider-bindings${buildQueryString({
+        providerId: parsed.providerId,
+        enabled: parsed.enabled,
+      })}`,
+    });
+    return workspaceProviderBindingSchema.array().parse(result) as WorkspaceProviderBinding[];
+  },
+};
 
 export function requestMobileRunFileDownloadUrl(runId: string, filePath: string) {
   return getRunFileDownloadUrl(mobileRunsApi, mobileApiBaseUrl, runId, filePath);

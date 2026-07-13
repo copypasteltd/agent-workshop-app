@@ -8,7 +8,10 @@ import {
   resolveMobileEntrySurface,
 } from "./catalog";
 import { mapRunSnapshotToMobileTask } from "./liveTaskAdapters";
-import type { MobileWorkspaceView } from "./workspaceContext";
+import {
+  hasAuthoritativeMobileWorkspaceContext,
+  type MobileWorkspaceView,
+} from "./workspaceContext";
 
 type MobileWorkspaceCatalogResult = {
   entrySurface: ReturnType<typeof resolveMobileEntrySurface>;
@@ -18,7 +21,8 @@ type MobileWorkspaceCatalogResult = {
   combinedTasks: MobileTask[];
   recentTasks: MobileTask[];
   availableTaskTags: string[];
-  taskDataMode: "live" | "empty";
+  taskDataMode: "waiting" | "live" | "empty";
+  workspaceDataReady: boolean;
   metrics: {
     workshops: number;
     services: number;
@@ -37,6 +41,7 @@ export function useMobileWorkspaceCatalog(
   currentWorkspace: MobileWorkspaceView
 ): MobileWorkspaceCatalogResult {
   const entrySurface = resolveMobileEntrySurface();
+  const workspaceDataReady = hasAuthoritativeMobileWorkspaceContext(currentWorkspace);
   const workshopsQuery = useQuery({
     queryKey: [
       "mobile",
@@ -51,6 +56,7 @@ export function useMobileWorkspaceCatalog(
         workspaceContextKey: currentWorkspace.id,
         entrySurface,
       }),
+    enabled: workspaceDataReady,
     retry: false,
     staleTime: 30_000,
     select: (items) => items.map(mapWorkshopCatalogEntryToMobileWorkshop),
@@ -70,6 +76,7 @@ export function useMobileWorkspaceCatalog(
         workspaceContextKey: currentWorkspace.id,
         entrySurface,
       }),
+    enabled: workspaceDataReady,
     retry: false,
     staleTime: 30_000,
     select: (items) => items.map(mapServiceCatalogEntryToMobileService),
@@ -84,6 +91,7 @@ export function useMobileWorkspaceCatalog(
         return [];
       }
     },
+    enabled: workspaceDataReady,
     refetchInterval: 10_000,
     retry: false,
   });
@@ -97,6 +105,7 @@ export function useMobileWorkspaceCatalog(
         return null;
       }
     },
+    enabled: workspaceDataReady,
     refetchInterval: 10_000,
     retry: false,
   });
@@ -112,7 +121,7 @@ export function useMobileWorkspaceCatalog(
         return null;
       }
     },
-    enabled: currentWorkspace.source === "auth",
+    enabled: workspaceDataReady && currentWorkspace.source === "auth",
     retry: false,
     staleTime: 15_000,
   });
@@ -133,10 +142,16 @@ export function useMobileWorkspaceCatalog(
     runsSummaryQuery.data != null
       ? runsSummaryQuery.data.total > 0
       : liveTasks.length > 0;
-  const taskDataMode: MobileWorkspaceCatalogResult["taskDataMode"] = hasLiveTaskData
-    ? "live"
-    : "empty";
+  const taskDataMode: MobileWorkspaceCatalogResult["taskDataMode"] = !workspaceDataReady
+    ? "waiting"
+    : hasLiveTaskData
+      ? "live"
+      : "empty";
   const availableTaskTags = useMemo(() => {
+    if (!workspaceDataReady) {
+      return [];
+    }
+
     if (taskDataMode === "live" && runsSummaryQuery.data) {
       return runsSummaryQuery.data.byTag
         .map((item) => item.key)
@@ -147,12 +162,16 @@ export function useMobileWorkspaceCatalog(
     return Array.from(
       new Set(liveTasks.flatMap((item) => item.tags).filter((tag) => tag.startsWith("#")))
     ).slice(0, 4);
-  }, [liveTasks, runsSummaryQuery.data, taskDataMode]);
+  }, [liveTasks, runsSummaryQuery.data, taskDataMode, workspaceDataReady]);
   const combinedTasks = useMemo(
     () => (taskDataMode === "live" ? liveTasks : []),
     [liveTasks, taskDataMode]
   );
   const recentTasks = useMemo(() => {
+    if (!workspaceDataReady) {
+      return [];
+    }
+
     const recentRunIds =
       recentActivitiesQuery.data?.items
         .map((item) => item.runId)
@@ -169,7 +188,7 @@ export function useMobileWorkspaceCatalog(
     const seen = new Set(ordered.map((item) => item.id));
 
     return [...ordered, ...combinedTasks.filter((item) => !seen.has(item.id))].slice(0, 3);
-  }, [combinedTasks, recentActivitiesQuery.data]);
+  }, [combinedTasks, recentActivitiesQuery.data, workspaceDataReady]);
   const metrics = useMemo(
     () => ({
       workshops: visibleWorkshops.length,
@@ -188,6 +207,7 @@ export function useMobileWorkspaceCatalog(
     recentTasks,
     availableTaskTags,
     taskDataMode,
+    workspaceDataReady,
     metrics,
     workshopsQuery,
     servicesQuery,

@@ -1,11 +1,14 @@
 import { useMemo } from "react";
-import { listMobileWorkspaceViews, resolveMobileWorkspaceView } from "./workspaceContext";
+import {
+  hasAuthoritativeMobileWorkspaceContext,
+  listMobileWorkspaceViews,
+  resolveMobileWorkspaceView,
+} from "./workspaceContext";
 import { useMobileAuthStore } from "../stores/mobileAuthStore";
 import { useMobileUiStore } from "../stores/mobileUiStore";
 
 export function useResolvedMobileWorkspace() {
   const currentWorkspaceId = useMobileUiStore((state) => state.currentWorkspaceId);
-  const authMode = useMobileAuthStore((state) => state.authMode);
   const authWorkspaces = useMobileAuthStore((state) => state.workspaces);
   const authCurrentWorkspace = useMobileAuthStore((state) => state.currentWorkspace);
 
@@ -13,25 +16,30 @@ export function useResolvedMobileWorkspace() {
     () =>
       resolveMobileWorkspaceView({
         selectionId: currentWorkspaceId,
-        workspaces: authMode === "required" ? authWorkspaces : undefined,
-        fallbackWorkspaceId: authCurrentWorkspace?.workspaceId,
+        workspaces: authWorkspaces.length > 0 ? authWorkspaces : undefined,
+        fallbackWorkspace: authCurrentWorkspace,
       }),
-    [authCurrentWorkspace?.workspaceId, authMode, authWorkspaces, currentWorkspaceId]
+    [authCurrentWorkspace, authWorkspaces, currentWorkspaceId]
   );
 }
 
 export function useAvailableMobileWorkspaces() {
   const currentWorkspace = useResolvedMobileWorkspace();
-  const authMode = useMobileAuthStore((state) => state.authMode);
   const authWorkspaces = useMobileAuthStore((state) => state.workspaces);
 
   return useMemo(
     () => {
       const authViews = listMobileWorkspaceViews(
-        authMode === "required" ? authWorkspaces : undefined
+        authWorkspaces.length > 0 ? authWorkspaces : undefined
       );
-      return authViews.length > 0 ? authViews : [currentWorkspace];
+      if (authViews.length > 0) {
+        return authViews;
+      }
+
+      return hasAuthoritativeMobileWorkspaceContext(currentWorkspace)
+        ? [currentWorkspace]
+        : [];
     },
-    [authMode, authWorkspaces, currentWorkspace]
+    [authWorkspaces, currentWorkspace]
   );
 }

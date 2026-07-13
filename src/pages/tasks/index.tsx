@@ -12,7 +12,8 @@ export default function TasksPage() {
   const [statusFilter, setStatusFilter] = useState<"all" | "running" | "approval" | "done">("all");
   const [tagFilter, setTagFilter] = useState("all");
   const currentWorkspace = useResolvedMobileWorkspace();
-  const { availableTaskTags, combinedTasks, taskDataMode } = useMobileWorkspaceCatalog(currentWorkspace);
+  const { availableTaskTags, combinedTasks, taskDataMode, workspaceDataReady } =
+    useMobileWorkspaceCatalog(currentWorkspace);
 
   const filteredRunsQuery = useQuery({
     queryKey: [
@@ -43,6 +44,7 @@ export default function TasksPage() {
         return [];
       }
     },
+    enabled: workspaceDataReady,
     refetchInterval: 10_000,
     retry: false,
   });
@@ -82,7 +84,9 @@ export default function TasksPage() {
   ];
 
   const listSummary =
-    taskDataMode === "live"
+    taskDataMode === "waiting"
+      ? `Waiting for the current workspace context before loading live runs in ${currentWorkspace.name}`
+      : taskDataMode === "live"
       ? `${filteredTasks.length} live run${filteredTasks.length === 1 ? "" : "s"} in ${currentWorkspace.name}`
       : `No continuing runs in ${currentWorkspace.name}`;
 
@@ -99,13 +103,17 @@ export default function TasksPage() {
         </View>
 
         <View className="filter-block">
-          {taskDataMode === "empty" ? (
+          {taskDataMode !== "live" ? (
             <View className="file-card">
               <View className="card-row">
                 <View>
-                  <View className="file-name">No live runs yet</View>
+                  <View className="file-name">
+                    {workspaceDataReady ? "No live runs yet" : "Waiting for workspace context"}
+                  </View>
                   <View className="file-meta">
-                    This workspace is already using authoritative data. Start a new instance from Workshop to open a real conversation.
+                    {workspaceDataReady
+                      ? "This workspace is already using authoritative data. Start a new instance from Workshop to open a real conversation."
+                      : "The task list stays paused until the app restores an authoritative workspace context from the backend session."}
                   </View>
                 </View>
                 <View className="pill">0 run</View>
@@ -151,10 +159,16 @@ export default function TasksPage() {
           {filteredTasks.length === 0 ? (
             <View className="empty-state">
               <View className="section-title">
-                {taskDataMode === "empty" ? "No runs in this workspace" : "No matching tasks"}
+                {taskDataMode === "waiting"
+                  ? "Waiting for workspace context"
+                  : taskDataMode === "empty"
+                    ? "No runs in this workspace"
+                    : "No matching tasks"}
               </View>
               <View className="empty-copy">
-                {taskDataMode === "empty"
+                {taskDataMode === "waiting"
+                  ? "Restore the current workspace session first, then the task center will load only live runs from the formal backend chain."
+                  : taskDataMode === "empty"
                   ? "Go back to Workshop and start a new agent instance to begin a full conversation."
                   : "Clear the search or switch the status and tag filters."}
               </View>
