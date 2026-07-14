@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button, Image, Input, View } from "@tarojs/components";
 import Taro from "@tarojs/taro";
 import { useDeferredValue, useMemo, useState } from "react";
-import logoMark from "../../assets/logo.svg";
+import logoMark from "../../assets/logo-ui.png";
 import workshopDrama from "../../assets/workshop-drama.svg";
 import workshopImage from "../../assets/workshop-image.svg";
 import workshopTax from "../../assets/workshop-tax.svg";
@@ -306,7 +306,7 @@ export default function WorkshopsPage() {
           <View className="section-head">
             <View className="brand-row">
               <View className="brand-mark">
-                <Image src={logoMark} mode="aspectFill" />
+                <Image src={logoMark} mode="aspectFit" />
               </View>
               <View>
                 <View className="page-eyebrow">灵办词元 / 当前空间</View>

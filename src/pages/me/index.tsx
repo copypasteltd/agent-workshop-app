@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button, Image, Input, View } from "@tarojs/components";
 import Taro from "@tarojs/taro";
 import { useMemo, useState } from "react";
-import logoMark from "../../assets/logo.svg";
+import logoMark from "../../assets/logo-ui.png";
 import {
   mobileAuthApi,
   mobileBillingApi,
@@ -287,7 +287,6 @@ export default function MePage() {
       try {
         return await mobileQuotaApi.listPolicies({
           workspaceContextKey: currentWorkspace.id,
-          enabled: true,
         });
       } catch {
         return [];
@@ -367,7 +366,6 @@ export default function MePage() {
       try {
         return await mobileBillingApi.listEntries({
           workspaceContextKey: currentWorkspace.id,
-          limit: 6,
         });
       } catch {
         return [];
@@ -1016,7 +1014,7 @@ export default function MePage() {
           <View className="card-row">
             <View className="brand-row">
               <View className="brand-mark">
-                <Image src={logoMark} mode="aspectFill" />
+                <Image src={logoMark} mode="aspectFit" />
               </View>
               <View>
                 <View className="section-title">
@@ -1042,7 +1040,7 @@ export default function MePage() {
               </Button>
               {authMode === "required" ? (
                 <Button
-                  className="pill"
+                  className="pill profile-logout-btn"
                   disabled={logoutMutation.isPending}
                   onClick={() => logoutMutation.mutate()}
                 >

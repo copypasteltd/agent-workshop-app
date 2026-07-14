@@ -1,3 +1,6 @@
+const tabbarAssetRoot =
+  process.env.NODE_ENV === "development" ? "/assets/tabbar" : "assets/tabbar";
+
 export default defineAppConfig({
   pages: [
     "pages/workshops/index",
@@ -23,20 +26,20 @@ export default defineAppConfig({
       {
         pagePath: "pages/workshops/index",
         text: "工坊",
-        iconPath: "assets/tabbar/workshops.png",
-        selectedIconPath: "assets/tabbar/workshops-active.png",
+        iconPath: `${tabbarAssetRoot}/workshops.png`,
+        selectedIconPath: `${tabbarAssetRoot}/workshops-active.png`,
       },
       {
         pagePath: "pages/tasks/index",
         text: "任务",
-        iconPath: "assets/tabbar/tasks.png",
-        selectedIconPath: "assets/tabbar/tasks-active.png",
+        iconPath: `${tabbarAssetRoot}/tasks.png`,
+        selectedIconPath: `${tabbarAssetRoot}/tasks-active.png`,
       },
       {
         pagePath: "pages/me/index",
         text: "我的",
-        iconPath: "assets/tabbar/me.png",
-        selectedIconPath: "assets/tabbar/me-active.png",
+        iconPath: `${tabbarAssetRoot}/me.png`,
+        selectedIconPath: `${tabbarAssetRoot}/me-active.png`,
       },
     ],
   },

@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { useLaunch } from "@tarojs/taro";
+import Taro, { useLaunch } from "@tarojs/taro";
 import type { PropsWithChildren } from "react";
 import { useEffect, useMemo } from "react";
 import { MobileAuthGate } from "./components/MobileAuthGate";
@@ -42,6 +42,26 @@ function App({ children }: PropsWithChildren) {
         : `${currentWorkspace.name} / 灵办词元`;
     document.body.dataset.theme = theme;
     applyMobileTheme(theme);
+    void Taro.setTabBarStyle(
+      theme === "light"
+        ? {
+            color: "#657283",
+            selectedColor: "#5366eb",
+            backgroundColor: "#f4f7fb",
+            borderStyle: "white",
+          }
+        : {
+            color: "#8c98ad",
+            selectedColor: "#c7ffd7",
+            backgroundColor: "#0e1524",
+            borderStyle: "black",
+        }
+    );
+    if (authMode === "required" && !authenticated) {
+      void Taro.hideTabBar({ animation: false });
+    } else {
+      void Taro.showTabBar({ animation: false });
+    }
   }, [authMode, authenticated, currentWorkspace.name, theme]);
 
   return (

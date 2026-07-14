@@ -76,14 +76,14 @@ export default function ServiceDetailPage() {
   });
   const providerBindingsQuery = useQuery({
     queryKey: ["mobile", "launch-provider-bindings", currentWorkspace.selectionId, currentWorkspace.id],
-    queryFn: async () => mobileProvidersApi.listBindings({ enabled: true }),
+    queryFn: async () => mobileProvidersApi.listBindings(),
     enabled: workspaceDataReady,
     retry: false,
     staleTime: 30_000,
   });
   const providerProfilesQuery = useQuery({
     queryKey: ["mobile", "launch-provider-profiles", currentWorkspace.selectionId, currentWorkspace.id],
-    queryFn: async () => mobileProvidersApi.listProviders({ enabled: true }),
+    queryFn: async () => mobileProvidersApi.listProviders(),
     enabled: workspaceDataReady,
     retry: false,
     staleTime: 30_000,
@@ -285,7 +285,7 @@ export default function ServiceDetailPage() {
             <View className="pill active">{service.eta}</View>
           </View>
           <View className="section-copy">{service.summary}</View>
-          <View className="file-row">
+          <View className="file-row service-auth-row">
             <View>
               <View className="file-name">当前工作区</View>
               <View className="file-meta">
@@ -302,7 +302,7 @@ export default function ServiceDetailPage() {
               <View className="file-name">授权要求</View>
               <View className="file-meta">{service.auth}</View>
             </View>
-            <View className="pill">启动后补全资料</View>
+            <View className="pill service-info-pill">启动后补全资料</View>
           </View>
           <View className="file-card" style={{ marginTop: "14px" }}>
             <View className="file-name">Provider 路由</View>
@@ -335,11 +335,11 @@ export default function ServiceDetailPage() {
                 {selectedLaunchProvider?.allowUserOverride ? (
                   <>
                     <Input
-                      className="composer-input"
+                      className="composer-input provider-model-input"
                       style={{ marginTop: "10px" }}
                       value={launchProviderModel}
                       onInput={(event) => setLaunchProviderModel(event.detail.value)}
-                      placeholder="留空使用默认模型；填写后按该模型启动"
+                      placeholder="可选：覆盖默认模型"
                     />
                     {launchProviderOverrideHelp ? (
                       <View className="section-copy" style={{ marginTop: "8px" }}>

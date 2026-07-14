@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button, Image, Input, View } from "@tarojs/components";
-import logoMark from "../assets/logo.svg";
+import logoMark from "../assets/logo-ui.png";
 import { mobileAuthApi } from "../lib/api";
 import { useMobileAuthStore } from "../stores/mobileAuthStore";
 import { useMobileUiStore } from "../stores/mobileUiStore";
@@ -85,7 +85,7 @@ export function MobileAuthScreen() {
             <View className="card-row">
               <View className="brand-row">
                 <View className="brand-mark auth-brand-mark">
-                  <Image src={logoMark} mode="aspectFill" />
+                  <Image src={logoMark} mode="aspectFit" />
                 </View>
                 <View>
                   <View className="page-eyebrow">灵办词元 / 账户登录</View>

@@ -563,7 +563,7 @@ export default function TaskDetailPage() {
       }
 
       try {
-        return await mobileBillingApi.listEntries({ runId: id, limit: 4 });
+        return await mobileBillingApi.listEntries({ runId: id });
       } catch {
         return [];
       }

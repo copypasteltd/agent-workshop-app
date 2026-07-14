@@ -36,10 +36,11 @@ export default defineConfig<"vite">(async (merge) => {
   // packages in production builds to reduce cross-package compile pressure.
   const useSourceAliases =
     process.env.NODE_ENV === "development" || process.env.LINGBAN_USE_SOURCE_ALIASES === "1";
+  const designWidth = process.env.TARO_ENV === "h5" ? 375 : 750;
   const baseConfig: UserConfigExport<"vite"> = {
     projectName: "lingban-mobile",
     date: "2026-7-7",
-    designWidth: 750,
+    designWidth,
     deviceRatio: {
       640: 2.34 / 2,
       750: 1,

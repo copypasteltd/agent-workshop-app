@@ -3,7 +3,7 @@ import type {
   AuthDisabledSessionBootstrap,
   AuthSessionEnvelope,
 } from "@lingban/contracts";
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { View } from "@tarojs/components";
 import { mobileApiBaseUrl, mobileAuthFetch } from "../lib/api";
 import { inferMobileWorkspaceContextKey } from "../lib/workspaceContext";
@@ -98,17 +98,11 @@ function syncWorkspaceSelection(
 }
 
 export function MobileAuthGate({ children }: PropsWithChildren) {
-  const startedRef = useRef(false);
   const authMode = useMobileAuthStore((state) => state.authMode);
   const authenticated = useMobileAuthStore((state) => state.authenticated);
   const bootstrapping = useMobileAuthStore((state) => state.bootstrapping);
 
   useEffect(() => {
-    if (startedRef.current) {
-      return;
-    }
-
-    startedRef.current = true;
     let cancelled = false;
 
     const bootstrap = async () => {
