@@ -24,8 +24,55 @@ import {
 } from "@lingban/contracts";
 import { useMobileAuthStore } from "../stores/mobileAuthStore";
 
-export const mobileApiBaseUrl =
-  process.env.TARO_APP_API_BASE_URL?.trim() || "http://127.0.0.1:3100";
+type MobileRuntimeWindow = Window & {
+  __LINGBAN_RUNTIME_CONFIG__?: {
+    apiBaseUrl?: string;
+  };
+};
+
+function normalizeApiBaseUrl(value?: string | null) {
+  const trimmed = value?.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  return trimmed.replace(/\/+$/, "");
+}
+
+function resolveMobileApiBaseUrl() {
+  if (typeof window !== "undefined") {
+    const runtimeBaseUrl = normalizeApiBaseUrl(
+      (window as MobileRuntimeWindow).__LINGBAN_RUNTIME_CONFIG__?.apiBaseUrl
+    );
+    if (runtimeBaseUrl) {
+      return runtimeBaseUrl;
+    }
+  }
+
+  const configuredBaseUrl = normalizeApiBaseUrl(process.env.TARO_APP_API_BASE_URL);
+  if (configuredBaseUrl) {
+    return configuredBaseUrl;
+  }
+
+  if (process.env.TARO_ENV === "h5" && typeof window !== "undefined") {
+    const { protocol, hostname, port, host } = window.location;
+    const isLocalHost = hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
+
+    if (isLocalHost) {
+      return `${protocol}//${hostname}:3100`;
+    }
+
+    if (port === "38110" || port === "38120") {
+      return `${protocol}//${hostname}:38130`;
+    }
+
+    return `${protocol}//${host}`;
+  }
+
+  return "http://127.0.0.1:3100";
+}
+
+export const mobileApiBaseUrl = resolveMobileApiBaseUrl();
 
 function getMobileAccessToken() {
   return useMobileAuthStore.getState().tokens?.accessToken;
