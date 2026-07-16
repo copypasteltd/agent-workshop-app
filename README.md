@@ -102,17 +102,23 @@ Standalone workspace exports expose the same commands from their generated root 
 - H5 以 375 设计宽度构建；小程序仍使用 750 设计宽度。
 - 登录态恢复完成前隐藏业务 TabBar，防止认证页和主导航叠加。
 
+## Session Capture / Session Capture
+
+The task conversation page provides a bottom sheet for Terminal and completed-turn Checkpoint capture. It submits safe workspace selection defaults, polls progress, restores state after reload, exposes retry for failed captures, and deep-links completed captures to the Creator workbench.
+
+Session Capture does not add a bottom navigation tab. The product navigation remains `工坊 / 任务 / 我的`, and the task detail remains a full Codex conversation surface.
+
 ## 当前状态 / Current Status
 
-截至 2026-07-14，H5 已接入认证、工作区、工坊、服务、任务、实时对话、上传、文件、审批、Provider 选择、配额摘要与个人中心主链。生产构建已完成移动端布局、明暗主题、TabBar 资源与认证滚动修复。
+截至 2026-07-17，H5 已接入认证、工作区、工坊、服务、任务、实时对话、上传、文件、审批、Provider 选择、配额摘要、Session Capture 与个人中心主链。生产构建已完成移动端布局、明暗主题、TabBar 资源与认证滚动修复。
 
-As of 2026-07-14, the H5 client is wired to the production API surface for authentication, workspaces, workshops, services, tasks, realtime conversations, uploads, files, approvals, provider selection, quota summaries, and account views.
+As of 2026-07-17, the H5 client covers authentication, workspaces, workshops, services, tasks, realtime conversations, uploads, files, approvals, provider selection, quota summaries, Session Capture, and account views.
 
 | 验证项 | 结果 |
 | --- | --- |
 | TypeScript | 通过 |
 | H5 production build | 通过 |
-| Playwright 双端 E2E | 23/23 通过 |
+| Playwright Dashboard/Admin/H5 E2E | 32/32 通过 |
 | Mobile 页面状态视觉检查 | 14/14 通过 |
 | 当前验收地址 | `http://192.168.31.20:38120/` |
 

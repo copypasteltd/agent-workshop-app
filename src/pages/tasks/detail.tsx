@@ -5,10 +5,11 @@ import type {
   RunConversationAttachment,
   RunConversationMessage,
   RunInformationCollection,
+  SessionCaptureRecord,
   SendRunMessageInput,
 } from "@lingban/contracts";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Button, Input, Textarea, View } from "@tarojs/components";
+import { Button, Image, Input, Textarea, View } from "@tarojs/components";
 import Taro, { getCurrentInstance } from "@tarojs/taro";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { MobileTaskMessage } from "../../data/mobileData";
@@ -19,7 +20,8 @@ import {
   formatBillingQuantity,
   formatBillingUsd,
 } from "../../lib/billing";
-import { mobileBillingApi, mobileQuotaApi, mobileRunsApi } from "../../lib/api";
+import { mobileBillingApi, mobileQuotaApi, mobileRunsApi, mobileSessionCapturesApi } from "../../lib/api";
+import archiveIcon from "../../assets/archive.svg";
 import { isLiveTaskId, mapRunSnapshotToMobileTask } from "../../lib/liveTaskAdapters";
 import {
   formatQuotaValue,
@@ -356,6 +358,28 @@ function deliveryStatusTone(status: MobileOutgoingMessageStatus) {
   }
 }
 
+function captureStatusTone(status: SessionCaptureRecord["status"]) {
+  if (status === "CAPTURED") return "success";
+  if (status === "FAILED" || status === "CANCELLED") return "warn";
+  return "active";
+}
+
+function formatCaptureBytes(value: number) {
+  if (value >= 1024 * 1024) return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+  if (value >= 1024) return `${(value / 1024).toFixed(1)} KB`;
+  return `${value} B`;
+}
+
+function openCreatorDashboard() {
+  if (typeof window === "undefined") return;
+  const url = new URL(window.location.href);
+  if (url.port === "38120") url.port = "38110";
+  url.pathname = "/workspace/creator";
+  url.search = "";
+  url.hash = "";
+  window.location.assign(url.toString());
+}
+
 function attachmentsEqual(
   left: RunConversationAttachment[] | Array<{ label: string; path: string }>,
   right: Array<{ label: string; path: string }>
@@ -426,6 +450,8 @@ export default function TaskDetailPage() {
   const outgoingPayloadsRef = useRef<
     Record<string, { text: string; drafts: BrowserAttachmentDraft[] }>
   >({});
+  const [captureSheetOpen, setCaptureSheetOpen] = useState(false);
+  const [submittedCaptureId, setSubmittedCaptureId] = useState<string | null>(null);
 
   const liveTaskQuery = useQuery({
     enabled: liveTaskId,
@@ -445,6 +471,15 @@ export default function TaskDetailPage() {
     refetchInterval: 10_000,
   });
   const liveSnapshot = liveTaskQuery.data;
+  const capturesQuery = useQuery({
+    enabled: liveTaskId && Boolean(id),
+    queryKey: ["mobile", "session-captures", id],
+    queryFn: async () => (await mobileSessionCapturesApi.list(id!)).items,
+    refetchInterval: (query) =>
+      query.state.data?.some((capture) => !["CAPTURED", "FAILED", "CANCELLED"].includes(capture.status))
+        ? 1_500
+        : 8_000,
+  });
   const pendingApproval = useMemo(
     () => liveSnapshot?.approvals.find((item) => item.state === "pending") ?? null,
     [liveSnapshot]
@@ -690,6 +725,52 @@ export default function TaskDetailPage() {
   const hasInFlightOutgoing = outgoingMessages.some((item) => item.status !== "failed");
 
   const liveMode = Boolean(task);
+  const activeCapture =
+    capturesQuery.data?.find((capture) => capture.captureId === submittedCaptureId) ??
+    capturesQuery.data?.find((capture) => !["CAPTURED", "FAILED", "CANCELLED"].includes(capture.status)) ??
+    null;
+  const captureReady =
+    liveSnapshot?.agentThread?.currentTurnState === "completed" &&
+    Boolean(liveSnapshot.agentThread.currentTurnId);
+  const captureMutation = useMutation({
+    mutationFn: async () => {
+      if (!task || !liveSnapshot) throw new Error("当前任务不可固化");
+      return mobileSessionCapturesApi.create(task.id, {
+        mode: "terminal",
+        throughTurnId: liveSnapshot.agentThread?.currentTurnId ?? null,
+        workspaceSelection: {
+          targetPath: liveSnapshot.run.targetPath,
+          includeGlobs: ["**/*"],
+          excludeGlobs: [
+            ".git/**",
+            "**/node_modules/**",
+            "**/.env",
+            "**/.env.*",
+            "**/secrets/**",
+            "**/codex-home/**",
+            "**/tmp/**",
+            "**/.cache/**",
+          ],
+          includeArtifacts: true,
+          maxFiles: 100_000,
+          maxBytes: 5 * 1024 * 1024 * 1024,
+        },
+        destinationSessionId: null,
+        createDraft: true,
+        idempotencyKey: `h5:${task.id}:${Date.now()}`,
+      });
+    },
+    onSuccess: async (result) => {
+      setSubmittedCaptureId(result.capture.captureId);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["mobile", "session-captures", id] }),
+        queryClient.invalidateQueries({ queryKey: id ? mobileRunDetailQueryKey(id) : ["mobile", "runs"] }),
+      ]);
+    },
+    onError: (error) => {
+      Taro.showToast({ title: error instanceof Error ? error.message : "固化提交失败", icon: "none" });
+    },
+  });
   useMobileRecentRecorder(
     task && liveMode && currentWorkspace.source === "auth"
       ? {
@@ -1204,6 +1285,14 @@ export default function TaskDetailPage() {
           onClick={() => Taro.navigateTo({ url: `/pages/tasks/files?id=${task.id}` })}
         >
           查看文件
+        </Button>
+        <Button
+          className="tab-btn capture-tab-btn"
+          data-testid="mobile-task-capture-session"
+          onClick={() => setCaptureSheetOpen(true)}
+        >
+          <Image className="inline-action-icon" src={archiveIcon} mode="aspectFit" />
+          固化
         </Button>
       </View>
 
@@ -2002,6 +2091,71 @@ export default function TaskDetailPage() {
             </View>
           </>
       </View>
+
+      {captureSheetOpen ? (
+        <View className="capture-sheet-layer">
+          <View className="capture-sheet-backdrop" onClick={() => setCaptureSheetOpen(false)} />
+          <View className="capture-sheet" data-testid="mobile-task-capture-sheet">
+            <View className="sheet-handle" />
+            <View className="capture-sheet-head">
+              <View className="capture-sheet-title-wrap">
+                <Image className="capture-sheet-icon" src={archiveIcon} mode="aspectFit" />
+                <View>
+                  <View className="section-title">固化当前会话</View>
+                  <View className="section-copy">完整会话、业务文件与运行产物</View>
+                </View>
+              </View>
+              <Button className="pill" onClick={() => setCaptureSheetOpen(false)}>关闭</Button>
+            </View>
+
+            {activeCapture ? (
+              <View className="capture-mobile-progress">
+                <View className="capture-mobile-status">
+                  <View>
+                    <View className="summary-label">Capture 状态</View>
+                    <View className="summary-value">{activeCapture.status}</View>
+                  </View>
+                  <View className={`pill ${captureStatusTone(activeCapture.status)}`}>
+                    {formatCaptureBytes(activeCapture.capturedBytes)}
+                  </View>
+                </View>
+                <View className="capture-mobile-track">
+                  <View style={{ width: activeCapture.status === "CAPTURED" ? "100%" : activeCapture.status === "VERIFYING" ? "88%" : activeCapture.status === "UPLOADING" ? "68%" : activeCapture.status === "CAPTURING_WORKSPACE" ? "48%" : "24%" }} />
+                </View>
+                <View className="capture-mobile-grid">
+                  <View><View className="summary-label">事件</View><View className="summary-value">{activeCapture.eventCount}</View></View>
+                  <View><View className="summary-label">文件</View><View className="summary-value">{activeCapture.fileCount}</View></View>
+                  <View><View className="summary-label">安全</View><View className="summary-value">{activeCapture.securityState}</View></View>
+                </View>
+                {activeCapture.statusReason ? <View className="inline-error-banner">{activeCapture.errorCode ? `${activeCapture.errorCode}: ` : ""}{activeCapture.statusReason}</View> : null}
+                {activeCapture.status === "FAILED" ? (
+                  <Button className="send-btn" onClick={() => mobileSessionCapturesApi.retry(activeCapture.captureId).then(() => capturesQuery.refetch())}>重试固化</Button>
+                ) : null}
+                {activeCapture.status === "CAPTURED" ? (
+                  <>
+                    <View className="capture-mobile-success">Capture 已验证，Draft 已进入 Creator 工作台。</View>
+                    <Button className="send-btn" onClick={openCreatorDashboard}>前往 Dashboard 审核</Button>
+                  </>
+                ) : null}
+              </View>
+            ) : (
+              <>
+                <View className="capture-mobile-grid capture-mobile-source">
+                  <View><View className="summary-label">Thread</View><View className="summary-value mono">{liveSnapshot?.agentThread?.threadId ?? "--"}</View></View>
+                  <View><View className="summary-label">Turn</View><View className="summary-value mono">{liveSnapshot?.agentThread?.currentTurnId ?? "--"}</View></View>
+                  <View><View className="summary-label">路径</View><View className="summary-value mono">{liveSnapshot?.run.targetPath ?? "--"}</View></View>
+                </View>
+                <View className="capture-mobile-note">系统将排除 Git、依赖目录、环境文件、Secret、缓存和 Runtime 临时目录。固化成功后当前任务结束。</View>
+                {!captureReady ? <View className="inline-error-banner">当前 Turn 尚未完成，完成回复后才能固化。</View> : null}
+                {captureMutation.error ? <View className="inline-error-banner">{captureMutation.error.message}</View> : null}
+                <Button className="send-btn" disabled={!captureReady || captureMutation.isPending} onClick={() => captureMutation.mutate()}>
+                  {captureMutation.isPending ? "提交中" : "固化并结束任务"}
+                </Button>
+              </>
+            )}
+          </View>
+        </View>
+      ) : null}
     </View>
   );
 }

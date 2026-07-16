@@ -8,6 +8,7 @@ import {
   getRunFileDownloadUrl,
   createMcpGovernanceApiClient,
   createRunsApiClient,
+  createSessionCapturesApiClient,
   createSearchApiClient,
   createSessionRefreshFetch,
   createWorkshopCatalogApiClient,
@@ -103,6 +104,12 @@ export const mobileAuthApi = createAuthApiClient({
 });
 
 export const mobileRunsApi = createRunsApiClient({
+  baseUrl: mobileApiBaseUrl,
+  fetcher: mobileAuthFetch,
+  getAccessToken: getMobileAccessToken,
+});
+
+export const mobileSessionCapturesApi = createSessionCapturesApiClient({
   baseUrl: mobileApiBaseUrl,
   fetcher: mobileAuthFetch,
   getAccessToken: getMobileAccessToken,
