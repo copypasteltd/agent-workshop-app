@@ -12,6 +12,7 @@ import {
   mobileQuotaApi,
 } from "../../lib/api";
 import {
+  billingCostBasisLabel,
   billingSourceLabel,
   billingSourceTone,
   formatBillingQuantity,
@@ -98,7 +99,7 @@ function workspaceRolePriority(role: string) {
 
 function formatBillingTime(value: string | null) {
   if (!value) {
-    return "No activity yet";
+    return "暂无活动";
   }
 
   const date = new Date(value);
@@ -106,7 +107,7 @@ function formatBillingTime(value: string | null) {
     return value;
   }
 
-  return date.toLocaleString("en-US", {
+  return date.toLocaleString("zh-CN", {
     month: "2-digit",
     day: "2-digit",
     hour: "2-digit",
@@ -473,7 +474,7 @@ export default function MePage() {
 
   const normalizedVisibleTaskSummary =
     taskDataMode === "empty"
-      ? "No continuing runs yet"
+      ? "当前没有可继续的实例"
       : visibleTaskSummary;
 
   const switchWorkspaceMutation = useMutation({
@@ -783,7 +784,7 @@ export default function MePage() {
 
     for (const overrideRecord of quotaSummary.pendingOverrides.slice(0, 2)) {
       entries.push({
-        title: `${quotaMetricLabel(overrideRecord.metric)} override pending`,
+        title: `${quotaMetricLabel(overrideRecord.metric)} 配额覆盖待审批`,
         detail: `${overrideRecord.reasonSummary.zh} / ${overrideRecord.currentValue} -> ${overrideRecord.limitValue}`,
         status: quotaOverrideStatusLabel(overrideRecord.status),
         tone: quotaDecisionTone(overrideRecord.status),
@@ -792,7 +793,7 @@ export default function MePage() {
 
     if (quotaSummary.hottestCounter) {
       entries.push({
-        title: `${quotaMetricLabel(quotaSummary.hottestCounter.policy.metric)} is closest to limit`,
+        title: `${quotaMetricLabel(quotaSummary.hottestCounter.policy.metric)} 最接近限额`,
         detail: describeQuotaUsage(
           quotaSummary.hottestCounter.counter,
           quotaSummary.hottestCounter.policy
@@ -867,9 +868,9 @@ export default function MePage() {
 
     if (taskDataMode === "empty") {
       entries.push({
-        title: "No live runs in this workspace",
+        title: "当前工作区没有实时实例",
         detail:
-          "The workspace is already connected to authoritative data, but no run has been started yet. Open Workshop to launch a new agent instance.",
+          "当前工作区已连接正式数据，请从工坊启动新的 Agent 实例。",
       });
     }
 
@@ -906,17 +907,17 @@ export default function MePage() {
 
     if (quotaSummary.pendingOverrides.length > 0) {
       entries.push({
-        title: `${quotaSummary.pendingOverrides.length} quota approvals are waiting`,
+        title: `${quotaSummary.pendingOverrides.length} 个配额审批待处理`,
         detail:
-          "Open the related task conversation to approve or reject without leaving the current run context.",
+          "请进入关联任务对话完成批准或驳回，实例上下文将继续保留。",
       });
     }
 
     if (quotaSummary.alertEvents.length > 0) {
       entries.push({
-        title: `${quotaSummary.alertEvents.length} recent quota alerts`,
+        title: `${quotaSummary.alertEvents.length} 条近期配额告警`,
         detail:
-          "Workspace usage is approaching or crossing one of the configured limits.",
+          "当前工作区用量正在接近或已经超过已配置限额。",
       });
     }
 
@@ -1445,58 +1446,58 @@ export default function MePage() {
           <View className="file-card">
             <View className="section-head">
               <View>
-                <View className="page-eyebrow">Quota</View>
-                <View className="section-title">Capacity and approvals</View>
+                <View className="page-eyebrow">配额</View>
+                <View className="section-title">容量与审批</View>
               </View>
               <View
                 className={`pill ${
                   quotaSummary.pendingOverrides.length > 0 ? "warn" : "active"
                 }`}
               >
-                {quotaSummary.pendingOverrides.length} pending
+                {quotaSummary.pendingOverrides.length} 个待处理
               </View>
             </View>
 
             {!authDataEnabled ? (
               <View className="empty-state">
-                <View className="section-title">Quota summary appears after login</View>
+                <View className="section-title">登录后查看配额汇总</View>
                 <View className="empty-copy">
-                  Switch to an authenticated workspace to see live limits, approvals, and recent quota events.
+                  进入已登录工作区后，可以查看实时限额、审批和近期配额事件。
                 </View>
               </View>
             ) : quotaPoliciesQuery.isLoading && quotaEntries.length === 0 ? (
               <View className="file-row">
                 <View>
-                  <View className="file-name">Syncing workspace quota state</View>
+                  <View className="file-name">正在同步工作区配额状态</View>
                   <View className="file-meta">
-                    Pulling policies, counters, overrides, and recent events for the current workspace.
+                    正在获取当前工作区的策略、计数器、覆盖申请和近期事件。
                   </View>
                 </View>
               </View>
             ) : quotaSummary.policies.length === 0 ? (
               <View className="empty-state">
-                <View className="section-title">No active quota policies</View>
+                <View className="section-title">当前没有生效的配额策略</View>
                 <View className="empty-copy">
-                  This workspace is connected, but no quota policy has been published for the current scope yet.
+                  当前工作区已连接正式数据，当前范围尚未发布配额策略。
                 </View>
               </View>
             ) : (
               <>
                 <View className="profile-grid">
                   <View className="mini-card">
-                    <View className="page-eyebrow">Policies</View>
+                    <View className="page-eyebrow">策略</View>
                     <View className="mini-value">{quotaSummary.policies.length}</View>
                   </View>
                   <View className="mini-card">
-                    <View className="page-eyebrow">Pending</View>
+                    <View className="page-eyebrow">待审批</View>
                     <View className="mini-value">{quotaSummary.pendingOverrides.length}</View>
                   </View>
                   <View className="mini-card">
-                    <View className="page-eyebrow">Alerts</View>
+                    <View className="page-eyebrow">告警</View>
                     <View className="mini-value">{quotaSummary.alertEvents.length}</View>
                   </View>
                   <View className="mini-card">
-                    <View className="page-eyebrow">Hottest</View>
+                    <View className="page-eyebrow">最高占用</View>
                     <View className="mini-value">
                       {quotaSummary.hottestCounter
                         ? `${quotaMetricLabel(quotaSummary.hottestCounter.policy.metric)} / ${quotaWindowLabel(
@@ -1525,58 +1526,58 @@ export default function MePage() {
           <View className="file-card">
             <View className="section-head">
               <View>
-                <View className="page-eyebrow">Billing</View>
-                <View className="section-title">Metering and spend</View>
+                <View className="page-eyebrow">计费</View>
+                <View className="section-title">用量与支出</View>
               </View>
               <View
                 className={`pill ${
                   (billingOverview.summary?.totalEntriesCount ?? 0) > 0 ? "active" : ""
                 }`}
               >
-                {billingOverview.summary?.totalEntriesCount ?? 0} entries
+                {billingOverview.summary?.totalEntriesCount ?? 0} 条
               </View>
             </View>
 
             {!authDataEnabled ? (
               <View className="empty-state">
-                <View className="section-title">Billing summary appears after login</View>
+                <View className="section-title">登录后查看计费汇总</View>
                 <View className="empty-copy">
-                  Switch to an authenticated workspace to review live metering totals and recent billable actions.
+                  进入已登录工作区后，可以查看实时计量总额和近期计费活动。
                 </View>
               </View>
             ) : billingSummaryQuery.isLoading && billingOverview.recentEntries.length === 0 ? (
               <View className="file-row">
                 <View>
-                  <View className="file-name">Syncing billing ledger</View>
+                  <View className="file-name">正在同步计费明细</View>
                   <View className="file-meta">
-                    Pulling the latest metering totals, dominant metric, and recent entry stream for this workspace.
+                    正在获取当前工作区的最新计量总额、主要指标和近期条目。
                   </View>
                 </View>
               </View>
             ) : (billingOverview.summary?.totalEntriesCount ?? 0) === 0 ? (
               <View className="empty-state">
-                <View className="section-title">No billable activity yet</View>
+                <View className="section-title">当前没有计费活动</View>
                 <View className="empty-copy">
-                  Once this workspace starts sending messages, uploading files, or downloading results, metering will appear here.
+                  当前工作区发送消息、上传文件或下载结果后，计量记录将在这里显示。
                 </View>
               </View>
             ) : (
               <>
                 <View className="profile-grid">
                   <View className="mini-card">
-                    <View className="page-eyebrow">Amount</View>
+                    <View className="page-eyebrow">累计金额</View>
                     <View className="mini-value">
                       {formatBillingUsd(billingOverview.summary?.totalAmountUsd ?? 0)}
                     </View>
                   </View>
                   <View className="mini-card">
-                    <View className="page-eyebrow">Entries</View>
+                    <View className="page-eyebrow">计量条目</View>
                     <View className="mini-value">
                       {billingOverview.summary?.totalEntriesCount ?? 0}
                     </View>
                   </View>
                   <View className="mini-card">
-                    <View className="page-eyebrow">Top metric</View>
+                    <View className="page-eyebrow">主要指标</View>
                     <View className="mini-value">
                       {billingOverview.topMetric?.label.zh ??
                         billingOverview.topMetric?.label.en ??
@@ -1584,7 +1585,7 @@ export default function MePage() {
                     </View>
                   </View>
                   <View className="mini-card">
-                    <View className="page-eyebrow">Latest</View>
+                    <View className="page-eyebrow">最近更新</View>
                     <View className="mini-value">
                       {formatBillingTime(billingOverview.summary?.updatedAt ?? null)}
                     </View>
@@ -1599,7 +1600,7 @@ export default function MePage() {
                           {billingSourceLabel(entry.source)} / {entry.metric}
                         </View>
                         <View className="file-meta">
-                          {formatBillingQuantity(entry.quantity)} units / {entry.costBasis} / {formatBillingTime(entry.occurredAt)}
+                          {formatBillingQuantity(entry.quantity)} 单位 / {billingCostBasisLabel(entry.costBasis)} / {formatBillingTime(entry.occurredAt)}
                         </View>
                       </View>
                       <View className={`pill ${billingSourceTone(entry.source)}`}>

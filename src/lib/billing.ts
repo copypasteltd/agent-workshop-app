@@ -1,4 +1,4 @@
-import type { BillingSource } from "@lingban/contracts";
+import type { BillingCostBasis, BillingSource } from "@lingban/contracts";
 
 export function formatBillingUsd(value: number) {
   if (value >= 100) {
@@ -14,8 +14,8 @@ export function formatBillingUsd(value: number) {
 
 export function formatBillingQuantity(value: number) {
   return Number.isInteger(value)
-    ? value.toLocaleString("en-US")
-    : value.toLocaleString("en-US", {
+    ? value.toLocaleString("zh-CN")
+    : value.toLocaleString("zh-CN", {
         maximumFractionDigits: 4,
       });
 }
@@ -23,25 +23,29 @@ export function formatBillingQuantity(value: number) {
 export function billingSourceLabel(source: BillingSource) {
   switch (source) {
     case "run-message":
-      return "Run message";
+      return "运行消息";
     case "run-upload":
-      return "Run upload";
+      return "运行附件上传";
     case "file-read":
-      return "File read";
+      return "文件读取";
     case "file-preview":
-      return "File preview";
+      return "文件预览";
     case "download-ticket":
-      return "Download ticket";
+      return "下载凭证";
     case "file-download":
-      return "Direct download";
+      return "文件下载";
     case "mcp-call":
-      return "MCP call";
+      return "MCP 调用";
     case "audit-export":
-      return "Audit export";
+      return "审计导出";
     case "runtime-estimate":
     default:
-      return "Runtime estimate";
+      return "运行时长估算";
   }
+}
+
+export function billingCostBasisLabel(costBasis: BillingCostBasis) {
+  return costBasis === "actual" ? "实际计量" : "预估计量";
 }
 
 export function billingSourceTone(source: BillingSource): "" | "active" | "warn" | "success" {

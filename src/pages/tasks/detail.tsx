@@ -15,6 +15,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { MobileTaskMessage } from "../../data/mobileData";
 import { formatAttachmentSize, pickBrowserAttachments, type BrowserAttachmentDraft } from "../../lib/attachments";
 import {
+  billingCostBasisLabel,
   billingSourceLabel,
   billingSourceTone,
   formatBillingQuantity,
@@ -58,7 +59,7 @@ function formatQuotaTime(value: string) {
 
 function formatBillingTime(value: string | null) {
   if (!value) {
-    return "No activity yet";
+    return "暂无活动";
   }
 
   const date = new Date(value);
@@ -66,7 +67,7 @@ function formatBillingTime(value: string | null) {
     return value;
   }
 
-  return date.toLocaleString("en-US", {
+  return date.toLocaleString("zh-CN", {
     month: "2-digit",
     day: "2-digit",
     hour: "2-digit",
@@ -669,7 +670,7 @@ export default function TaskDetailPage() {
   const mcpIssueCount = recentMcpCalls.filter((item) => item.status !== "success").length;
   const distinctMcpCount = new Set(recentMcpCalls.map((item) => item.mcpId)).size;
 
-  const approvalHeadline = pendingQuotaApproval ? "Quota approval pending" : "Pending approval";
+  const approvalHeadline = pendingQuotaApproval ? "配额审批待处理" : "审批待处理";
   const approvalSummary = pendingQuotaOverride
     ? pendingQuotaOverride.reasonSummary.zh
     : pendingApproval?.note?.trim() || pendingApproval?.prompt || "";
@@ -1616,9 +1617,9 @@ export default function TaskDetailPage() {
         <View className="module-card">
           <View className="section-head">
             <View>
-              <View className="module-title">Billing ledger</View>
+              <View className="module-title">计费明细</View>
               <View className="section-copy">
-                Live metering for this run, including messages, uploads, file access, downloads, and runtime.
+                当前实例的消息、上传、文件访问、下载与运行时长实时计量。
               </View>
             </View>
             <View
@@ -1626,7 +1627,7 @@ export default function TaskDetailPage() {
                 (billingSummaryQuery.data?.totalEntriesCount ?? 0) > 0 ? "active" : ""
               }`}
             >
-              {billingSummaryQuery.data?.totalEntriesCount ?? 0} entries
+              {billingSummaryQuery.data?.totalEntriesCount ?? 0} 条
             </View>
           </View>
 
@@ -1634,25 +1635,25 @@ export default function TaskDetailPage() {
             <>
               <View className="summary-grid">
                 <View className="summary-card">
-                  <View className="summary-label">Amount</View>
+                  <View className="summary-label">累计金额</View>
                   <View className="summary-value">
                     {formatBillingUsd(billingSummaryQuery.data?.totalAmountUsd ?? 0)}
                   </View>
                 </View>
                 <View className="summary-card">
-                  <View className="summary-label">Entries</View>
+                  <View className="summary-label">计量条目</View>
                   <View className="summary-value">
                     {billingSummaryQuery.data?.totalEntriesCount ?? 0}
                   </View>
                 </View>
                 <View className="summary-card">
-                  <View className="summary-label">Top metric</View>
+                  <View className="summary-label">主要指标</View>
                   <View className="summary-value">
                     {topBillingMetric?.label.zh ?? topBillingMetric?.label.en ?? "--"}
                   </View>
                 </View>
                 <View className="summary-card">
-                  <View className="summary-label">Latest</View>
+                  <View className="summary-label">最近更新</View>
                   <View className="summary-value">
                     {formatBillingTime(billingSummaryQuery.data?.updatedAt ?? null)}
                   </View>
@@ -1669,7 +1670,7 @@ export default function TaskDetailPage() {
                           {billingSourceLabel(entry.source)} / {entry.metric}
                         </View>
                         <View className="path-helper">
-                          {formatBillingQuantity(entry.quantity)} units / {entry.costBasis} / {formatBillingTime(entry.occurredAt)}
+                          {formatBillingQuantity(entry.quantity)} 单位 / {billingCostBasisLabel(entry.costBasis)} / {formatBillingTime(entry.occurredAt)}
                         </View>
                       </View>
                       <View className={`pill ${billingSourceTone(entry.source)}`}>
@@ -1682,7 +1683,7 @@ export default function TaskDetailPage() {
             </>
           ) : (
             <View className="section-copy">
-              No billable activity has been recorded for this run yet.
+              当前实例尚未产生可计费活动。
             </View>
           )}
         </View>
@@ -1692,7 +1693,7 @@ export default function TaskDetailPage() {
         <View className="module-card">
           <View className="section-head">
             <View>
-              <View className="module-title">MCP activity</View>
+              <View className="module-title">MCP 活动</View>
               <View className="section-copy">
                 这里展示当前实例真实发生的 connector 和 tool 调用，便于判断外部能力、风险级别和策略命中情况。
               </View>
@@ -1763,32 +1764,32 @@ export default function TaskDetailPage() {
               <View className="section-copy">{approvalSummary}</View>
             </View>
             <View className={`pill ${pendingQuotaApproval ? "warn" : "active"}`}>
-              {pendingQuotaApproval ? "quota" : "approval"}
+              {pendingQuotaApproval ? "配额" : "审批"}
             </View>
           </View>
 
           {pendingQuotaOverride ? (
             <View className="summary-grid">
               <View className="summary-card">
-                <View className="summary-label">Metric</View>
+                <View className="summary-label">指标</View>
                 <View className="summary-value">
                   {quotaMetricLabel(pendingQuotaOverride.metric)}
                 </View>
               </View>
               <View className="summary-card">
-                <View className="summary-label">Usage</View>
+                <View className="summary-label">用量</View>
                 <View className="summary-value">
                   {summarizeQuotaOverride(pendingQuotaOverride)}
                 </View>
               </View>
               <View className="summary-card">
-                <View className="summary-label">Scope</View>
+                <View className="summary-label">范围</View>
                 <View className="summary-value">
                   {quotaScopeLabel(pendingQuotaOverride.scopeType)}
                 </View>
               </View>
               <View className="summary-card">
-                <View className="summary-label">Role gate</View>
+                <View className="summary-label">审批角色</View>
                 <View className="summary-value">{pendingQuotaOverride.requiredRole}</View>
               </View>
             </View>
@@ -1822,7 +1823,7 @@ export default function TaskDetailPage() {
               disabled={approvalMutation.isPending}
               onClick={() => handleApprovalDecision(true)}
             >
-              {approvalMutation.isPending ? "Submitting" : "Approve"}
+              {approvalMutation.isPending ? "提交中" : "批准"}
             </Button>
             <Button
               className="pill warn"
@@ -1830,7 +1831,7 @@ export default function TaskDetailPage() {
               disabled={approvalMutation.isPending}
               onClick={() => handleApprovalDecision(false)}
             >
-              Reject
+              驳回
             </Button>
             <Button
               className="pill"
@@ -1838,14 +1839,14 @@ export default function TaskDetailPage() {
               onClick={() =>
                 applyInlineDraft(
                   pendingQuotaOverride
-                    ? `Please explain why ${quotaMetricLabel(
+                    ? `请说明 ${quotaMetricLabel(
                         pendingQuotaOverride.metric
-                      )} exceeded the current limit before I decide.`
-                    : "Please explain this approval request before I decide."
+                      )} 超出当前限额的原因，便于我决定是否批准。`
+                    : "请说明本次审批请求的原因，便于我决定是否批准。"
                 )
               }
             >
-              Ask Codex
+              询问 Codex
             </Button>
           </View>
 

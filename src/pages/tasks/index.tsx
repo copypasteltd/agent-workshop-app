@@ -77,18 +77,18 @@ export default function TasksPage() {
   ]);
 
   const statusOptions = [
-    { key: "all" as const, label: "All" },
-    { key: "running" as const, label: "Running" },
-    { key: "approval" as const, label: "Needs approval" },
-    { key: "done" as const, label: "Done" },
+    { key: "all" as const, label: "全部" },
+    { key: "running" as const, label: "运行中" },
+    { key: "approval" as const, label: "待审批" },
+    { key: "done" as const, label: "已完成" },
   ];
 
   const listSummary =
     taskDataMode === "waiting"
-      ? `Waiting for the current workspace context before loading live runs in ${currentWorkspace.name}`
+      ? `正在恢复 ${currentWorkspace.name} 的工作区上下文，完成后加载实时实例`
       : taskDataMode === "live"
-      ? `${filteredTasks.length} live run${filteredTasks.length === 1 ? "" : "s"} in ${currentWorkspace.name}`
-      : `No continuing runs in ${currentWorkspace.name}`;
+      ? `${currentWorkspace.name} 当前显示 ${filteredTasks.length} 个实时实例`
+      : `${currentWorkspace.name} 当前没有持续运行的实例`;
 
   return (
     <View className="page-shell">
@@ -97,7 +97,7 @@ export default function TasksPage() {
           <Input
             className="search-input"
             value={searchQuery}
-            placeholder="Search task, workshop, or tag"
+            placeholder="搜索任务、工坊或标签"
             onInput={(event) => setSearchQuery(event.detail.value)}
           />
         </View>
@@ -108,15 +108,15 @@ export default function TasksPage() {
               <View className="card-row">
                 <View>
                   <View className="file-name">
-                    {workspaceDataReady ? "No live runs yet" : "Waiting for workspace context"}
+                    {workspaceDataReady ? "当前没有实时实例" : "正在恢复工作区上下文"}
                   </View>
                   <View className="file-meta">
                     {workspaceDataReady
-                      ? "This workspace is already using authoritative data. Start a new instance from Workshop to open a real conversation."
-                      : "The task list stays paused until the app restores an authoritative workspace context from the backend session."}
+                      ? "当前工作区已连接正式数据。请从工坊启动新实例并进入完整对话。"
+                      : "任务列表将在后端会话恢复当前工作区上下文后加载。"}
                   </View>
                 </View>
-                <View className="pill">0 run</View>
+                <View className="pill">0 个实例</View>
               </View>
             </View>
           ) : null}
@@ -139,7 +139,7 @@ export default function TasksPage() {
               className={`task-chip ${tagFilter === "all" ? "active" : ""}`}
               onClick={() => setTagFilter("all")}
             >
-              All tags
+              全部标签
             </Button>
             {availableTaskTags.map((tag) => (
               <Button
@@ -160,17 +160,17 @@ export default function TasksPage() {
             <View className="empty-state">
               <View className="section-title">
                 {taskDataMode === "waiting"
-                  ? "Waiting for workspace context"
+                  ? "正在恢复工作区上下文"
                   : taskDataMode === "empty"
-                    ? "No runs in this workspace"
-                    : "No matching tasks"}
+                    ? "当前工作区没有实例"
+                    : "没有匹配任务"}
               </View>
               <View className="empty-copy">
                 {taskDataMode === "waiting"
-                  ? "Restore the current workspace session first, then the task center will load only live runs from the formal backend chain."
+                  ? "工作区会话恢复后，任务中心将从正式后端链路加载实时实例。"
                   : taskDataMode === "empty"
-                  ? "Go back to Workshop and start a new agent instance to begin a full conversation."
-                  : "Clear the search or switch the status and tag filters."}
+                  ? "请返回工坊启动新的 Agent 实例并开始完整对话。"
+                  : "请清空搜索条件，或切换状态和标签筛选。"}
               </View>
             </View>
           ) : null}
@@ -193,16 +193,16 @@ export default function TasksPage() {
                     {tag}
                   </View>
                 ))}
-                <View className="pill success">live</View>
+                <View className="pill success">实时</View>
               </View>
               <View className="card-row">
-                <View className="muted">Open the full task conversation</View>
+                <View className="muted">进入任务完整对话</View>
                 <Button
                   className="pill active"
                   data-testid={`mobile-task-open-${item.id}`}
                   onClick={() => Taro.navigateTo({ url: `/pages/tasks/detail?id=${item.id}` })}
                 >
-                  Open
+                  打开
                 </Button>
               </View>
             </View>
