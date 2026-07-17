@@ -633,6 +633,31 @@
     .task-shell[open] .chevron-wrap {
       transform: rotate(180deg);
     }
+
+    .approval-mode-control {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      margin-top: 10px;
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      background: var(--surface-2);
+    }
+
+    .approval-mode-title {
+      color: var(--text);
+      font-size: 13px;
+      line-height: 1.4;
+      font-weight: 700;
+    }
+
+    .approval-mode-description {
+      margin-top: 2px;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.45;
+    }
     .task-shell.is-open .chevron {
       transform: rotate(-135deg) translate(-1px, 1px);
     }

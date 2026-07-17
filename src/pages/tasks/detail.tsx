@@ -9,7 +9,7 @@ import type {
   SendRunMessageInput,
 } from "@lingban/contracts";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Button, Image, Input, Textarea, View } from "@tarojs/components";
+import { Button, Image, Input, Switch, Textarea, View } from "@tarojs/components";
 import Taro, { getCurrentInstance } from "@tarojs/taro";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { MobileTaskMessage } from "../../data/mobileData";
@@ -1036,6 +1036,29 @@ export default function TaskDetailPage() {
     },
   });
 
+  const approvalModeMutation = useMutation({
+    mutationFn: async (approvalMode: "manual" | "auto_all") => {
+      if (!task) {
+        throw new Error("Task not found.");
+      }
+      return await mobileRunsApi.setRunApprovalMode(task.id, { approvalMode });
+    },
+    onSuccess: async (snapshot) => {
+      if (!task) return;
+      queryClient.setQueryData(mobileRunDetailQueryKey(task.id), snapshot);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["mobile", "runs"] }),
+        queryClient.invalidateQueries({ queryKey: mobileRunDetailQueryKey(task.id) }),
+      ]);
+    },
+    onError: (error) => {
+      Taro.showToast({
+        title: error instanceof Error ? error.message : "自动审批设置更新失败",
+        icon: "none",
+      });
+    },
+  });
+
   const reviewMutation = useMutation({
     mutationFn: async (input: {
       answer: ReviewableInformationAnswer;
@@ -2032,6 +2055,25 @@ export default function TaskDetailPage() {
                 ))}
               </View>
             ) : null}
+            <View className="approval-mode-control" data-testid="mobile-approval-mode-control">
+              <View>
+                <View className="approval-mode-title">全自动审批</View>
+                <View className="approval-mode-description">
+                  {liveSnapshot?.run.approvalMode === "auto_all"
+                    ? "所有审批请求将自动通过"
+                    : "敏感操作等待人工确认"}
+                </View>
+              </View>
+              <Switch
+                data-testid="mobile-approval-mode-toggle"
+                checked={liveSnapshot?.run.approvalMode === "auto_all"}
+                disabled={approvalModeMutation.isPending}
+                color="#2f6fed"
+                onChange={(event) =>
+                  approvalModeMutation.mutate(event.detail.value ? "auto_all" : "manual")
+                }
+              />
+            </View>
             <View className="composer-row">
               <View className="task-row">
                 <Button
