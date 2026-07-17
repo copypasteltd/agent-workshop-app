@@ -17,6 +17,9 @@ function formatClock(iso: string) {
 }
 
 function resolveWorkshop(snapshot: RunSnapshot) {
+  if (snapshot.run.runPurpose === "creator_source") {
+    return "Creator Source Session";
+  }
   return (
     snapshot.run.catalogMetadata?.workshopName?.zh ??
     snapshot.run.catalogMetadata?.workshopId ??

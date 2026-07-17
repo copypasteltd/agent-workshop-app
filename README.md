@@ -98,6 +98,7 @@ Standalone workspace exports expose the same commands from their generated root 
 - 本次任务的材料、参数与目标由 Codex 在完整对话中动态收集。
 - 任务详情顶部摘要支持折叠，主要视区持续承载对话。
 - 任务、文件与审批均使用真实 API 和实时事件流。
+- Dashboard 创建的 Creator Source Run 会进入同一任务列表，并标记为 `Creator Source Session`，移动端可继续完整对话与查看文件。
 - 明暗主题同步页面背景、导航栏、TabBar 与系统色彩。
 - H5 以 375 设计宽度构建；小程序仍使用 750 设计宽度。
 - 登录态恢复完成前隐藏业务 TabBar，防止认证页和主导航叠加。
