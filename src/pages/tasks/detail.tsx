@@ -1297,7 +1297,7 @@ export default function TaskDetailPage() {
   }
 
   return (
-    <View className="page-shell" data-testid="mobile-task-detail-page">
+    <View className="page-shell task-detail-page" data-testid="mobile-task-detail-page">
       <View className="crumb-row">
         <Button className="crumb-btn" onClick={() => Taro.navigateBack()}>
           返回任务列表
@@ -1889,13 +1889,11 @@ export default function TaskDetailPage() {
           <View className="message-shell" key={message.localId ?? `${message.time}-${index}`}>
             <View className={`message-card ${message.kind}`}>
               <View className="message-head">
-                <View className={`avatar ${message.kind}`}>
-                  {message.kind === "agent" ? "C" : message.kind === "user" ? "你" : "系"}
-                </View>
-                <View>
+                <View className="message-identity">
+                  <View className={`message-role-marker ${message.kind}`} />
                   <View className="role">{message.role}</View>
-                  <View className="time">{message.time}</View>
                 </View>
+                <View className="time">{message.time}</View>
               </View>
               <View className="message-body">{message.body}</View>
               {message.deliveryStatus ? (
@@ -1953,7 +1951,7 @@ export default function TaskDetailPage() {
               </View>
             ) : null}
             {message.module ? (
-              <View className={`module-card ${message.module.type}`}>
+              <View className={`module-card message-module ${message.module.type}`}>
                 <View className="section-head">
                   <View>
                     <View className="module-title">{message.module.title}</View>
@@ -2008,10 +2006,20 @@ export default function TaskDetailPage() {
         ))}
       </View>
 
-      <View className="composer">
+      <View className="composer task-composer" data-testid="mobile-task-composer">
         <>
+            <View className="task-composer-head">
+              <View className="task-composer-title">继续对话</View>
+              <View
+                className={`task-connection-state ${runStream.connected ? "online" : ""}`}
+                data-testid="mobile-task-connection-state"
+              >
+                <View className="task-connection-dot" />
+                {runStream.connected ? "实时连接" : "正在连接"}
+              </View>
+            </View>
             <Textarea
-              className="composer-box composer-input"
+              className="composer-box composer-input task-composer-input"
               data-testid="mobile-task-composer-input"
               value={draft}
               maxlength={2000}
@@ -2055,7 +2063,7 @@ export default function TaskDetailPage() {
                 ))}
               </View>
             ) : null}
-            <View className="approval-mode-control" data-testid="mobile-approval-mode-control">
+            <View className="approval-mode-control task-approval-mode-control" data-testid="mobile-approval-mode-control">
               <View>
                 <View className="approval-mode-title">全自动审批</View>
                 <View className="approval-mode-description">
@@ -2077,7 +2085,7 @@ export default function TaskDetailPage() {
             <View className="composer-row">
               <View className="task-row">
                 <Button
-                  className="pill"
+                  className="pill composer-tool-button"
                   data-testid="mobile-task-add-attachments"
                   disabled={sendMessageMutation.isPending || hasInFlightOutgoing}
                   onClick={async () => {
@@ -2099,7 +2107,7 @@ export default function TaskDetailPage() {
                   附件
                 </Button>
                 <Button
-                  className="pill"
+                  className="pill composer-tool-button"
                   onClick={() =>
                     applyInlineDraft("请告诉我当前待审批动作是什么，并引导我逐项确认。")
                   }
@@ -2108,7 +2116,7 @@ export default function TaskDetailPage() {
                 </Button>
               </View>
               <Button
-                className="send-btn"
+                className="send-btn composer-send-button"
                 data-testid="mobile-task-send-button"
                 disabled={
                   sendMessageMutation.isPending ||
@@ -2127,9 +2135,7 @@ export default function TaskDetailPage() {
                   ? attachmentDrafts.length > 0
                     ? "上传并发送中"
                     : "发送处理中"
-                  : runStream.connected
-                    ? "实时发送"
-                    : "发送"}
+                  : "发送"}
               </Button>
             </View>
           </>

@@ -8,6 +8,7 @@ import { useResolvedMobileWorkspace } from "./lib/useMobileWorkspace";
 import { useMobileAuthStore } from "./stores/mobileAuthStore";
 import { useMobileUiStore } from "./stores/mobileUiStore";
 import "./app.css";
+import "./styles/task-detail.css";
 
 function App({ children }: PropsWithChildren) {
   const theme = useMobileUiStore((state) => state.theme);
