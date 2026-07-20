@@ -8,9 +8,10 @@ import type {
   SessionCaptureRecord,
   SendRunMessageInput,
 } from "@lingban/contracts";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button, Image, Input, Switch, Textarea, View } from "@tarojs/components";
-import Taro, { getCurrentInstance } from "@tarojs/taro";
+import Taro from "@tarojs/taro";
+import { useMobileQuery as useQuery } from "../../lib/useMobileQuery";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { MobileTaskMessage } from "../../data/mobileData";
 import { formatAttachmentSize, pickBrowserAttachments, type BrowserAttachmentDraft } from "../../lib/attachments";
@@ -38,6 +39,7 @@ import { mobileRunDetailQueryKey, mobileRunFilesQueryKey } from "../../lib/runQu
 import { useMobileRecentRecorder } from "../../lib/recent";
 import { useMobileRunStream } from "../../lib/runStream";
 import { useResolvedMobileWorkspace } from "../../lib/useMobileWorkspace";
+import { useMobileRouteParams } from "../../lib/useMobileRouteParams";
 import { useMobilePageShellClass } from "../../components/MobilePageShell";
 import {
   useMobileUiStore,
@@ -428,9 +430,17 @@ function mapOutgoingMessageToDisplay(
 }
 
 export default function TaskDetailPage() {
+  const params = useMobileRouteParams<{ id?: string }>();
+  const pageShellClass = useMobilePageShellClass("task-detail-page");
+  if (!params) {
+    return <View className={pageShellClass}><View className="section-copy">正在加载实例路由</View></View>;
+  }
+  return <TaskDetailContent id={params.id} />;
+}
+
+function TaskDetailContent({ id }: { id?: string }) {
   const pageShellClass = useMobilePageShellClass("task-detail-page");
   const queryClient = useQueryClient();
-  const id = getCurrentInstance().router?.params?.id;
   const liveTaskId = isLiveTaskId(id);
   const taskDrafts = useMobileUiStore((state) => state.taskDrafts);
   const taskOutbox = useMobileUiStore((state) => state.taskOutbox);

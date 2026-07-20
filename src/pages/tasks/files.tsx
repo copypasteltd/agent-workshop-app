@@ -1,8 +1,8 @@
 import type { RunFileEntry } from "@lingban/contracts";
 import { matchesSearchQuery } from "@lingban/domain-models";
-import { useQuery } from "@tanstack/react-query";
+import { useMobileQuery as useQuery } from "../../lib/useMobileQuery";
 import { Button, Image, Input, View } from "@tarojs/components";
-import Taro, { getCurrentInstance } from "@tarojs/taro";
+import Taro from "@tarojs/taro";
 import { useEffect, useMemo, useState } from "react";
 import { mobileRunsApi, requestMobileRunFileDownloadUrl } from "../../lib/api";
 import { isLiveTaskId, mapRunSnapshotToMobileTask } from "../../lib/liveTaskAdapters";
@@ -14,6 +14,7 @@ import {
 import { useMobileRecentRecorder } from "../../lib/recent";
 import { useMobileRunStream } from "../../lib/runStream";
 import { useResolvedMobileWorkspace } from "../../lib/useMobileWorkspace";
+import { useMobileRouteParams } from "../../lib/useMobileRouteParams";
 import { useMobilePageShellClass } from "../../components/MobilePageShell";
 
 function ensureTrailingSlash(value: string) {
@@ -113,8 +114,16 @@ function toTestIdSegment(value: string) {
 }
 
 export default function TaskFilesPage() {
+  const params = useMobileRouteParams<{ id?: string }>();
   const pageShellClass = useMobilePageShellClass();
-  const id = getCurrentInstance().router?.params?.id;
+  if (!params) {
+    return <View className={pageShellClass}><View className="section-copy">正在加载文件路由</View></View>;
+  }
+  return <TaskFilesContent id={params.id} />;
+}
+
+function TaskFilesContent({ id }: { id?: string }) {
+  const pageShellClass = useMobilePageShellClass();
   const liveTaskId = isLiveTaskId(id);
   const currentWorkspace = useResolvedMobileWorkspace();
   useMobileRunStream(liveTaskId ? id ?? null : null, liveTaskId);

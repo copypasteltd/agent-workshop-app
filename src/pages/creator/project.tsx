@@ -1,6 +1,7 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button, Input, Textarea, View } from "@tarojs/components";
-import Taro, { getCurrentInstance } from "@tarojs/taro";
+import Taro from "@tarojs/taro";
+import { useMobileQuery as useQuery } from "../../lib/useMobileQuery";
 import { useEffect, useMemo, useState } from "react";
 import { useMobilePageShellClass } from "../../components/MobilePageShell";
 import {
@@ -16,6 +17,7 @@ import {
 } from "../../lib/mobileCreator";
 import { resolveMobileCreatorProjectAction } from "../../lib/mobileCreatorFlow";
 import { useResolvedMobileWorkspace } from "../../lib/useMobileWorkspace";
+import { useMobileRouteParams } from "../../lib/useMobileRouteParams";
 import { hasAuthoritativeMobileWorkspaceContext } from "../../lib/workspaceContext";
 
 function formatTime(value: string) {
@@ -25,9 +27,17 @@ function formatTime(value: string) {
 }
 
 export default function CreatorProjectPage() {
+  const params = useMobileRouteParams<{ id?: string }>();
+  const pageShellClass = useMobilePageShellClass("creator-page-shell");
+  if (!params) {
+    return <View className={pageShellClass}><View className="section-copy">正在加载创作项目</View></View>;
+  }
+  return <CreatorProjectContent projectId={params.id ?? ""} />;
+}
+
+function CreatorProjectContent({ projectId }: { projectId: string }) {
   const pageShellClass = useMobilePageShellClass("creator-page-shell");
   const queryClient = useQueryClient();
-  const projectId = getCurrentInstance().router?.params?.id ?? "";
   const currentWorkspace = useResolvedMobileWorkspace();
   const workspaceReady = hasAuthoritativeMobileWorkspaceContext(currentWorkspace);
   const creatorAllowed =

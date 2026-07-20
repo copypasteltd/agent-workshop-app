@@ -157,8 +157,12 @@ The Creator pages now apply explicit cross-platform component classes, stable fo
 
 ## 2026-07-21 WeChat Capability Loading / 2026-07-21 微信能力加载
 
-微信小程序使用 `networkMode: "always"` 调度 React Query 请求，由 `Taro.request` 负责真实网络状态和 20 秒超时。该配置避免小程序 WebView 的浏览器在线状态将 Provider、MCP、Binding 和 Credential 查询永久置于 `pending/paused`。
+微信小程序统一通过 `useMobileQuery` 直接调度 API，由 `Taro.request` 负责网络请求与 20 秒超时。该适配层覆盖加载、成功、失败、手动刷新、定时刷新、`select` 数据转换和 QueryClient 缓存同步；H5 继续使用 TanStack Query。页面代码禁止直接从 `@tanstack/react-query` 导入 `useQuery`，生产构建会同时检查源码和微信页面产物。
 
 新建实例页现在区分加载中、加载失败和未配置状态。请求失败后显示“重新加载”，MCP 与 Credential 在查询完成前不会提前显示空态。全部账户级运行能力加载成功后，页面启用“启动空白 Codex”。
 
-The WeChat runtime always dispatches shared React Query operations through `Taro.request` and applies a finite request timeout. The new-instance page additionally invokes all five capability APIs through its own lifecycle state machine, removing first-load dependence on React Query observer scheduling.
+路由详情页使用 `useMobileRouteParams` 在 Taro 页面生命周期内接收参数，查询组件会在参数就绪后挂载。微信基础库固定为稳定版 `3.15.2`，规避灰度基础库 `3.17.0` 的 `subPageFrameEndTime` 内部异常。
+
+如果微信开发者工具同时加载旧页面块和新公共块，应关闭项目与 IDE，清理该项目的 `WeappCompileCache` 后重新执行 `pnpm build:weapp` 和预览。`scripts/verify-weapp-build.mjs` 会校验基础库版本、API 地址、直接查询适配层和页面查询边界。
+
+The WeChat runtime dispatches API calls through a dedicated lifecycle adapter while H5 retains TanStack Query. Route-bound pages mount their query content after Taro exposes route parameters. Production verification pins base library `3.15.2` and rejects direct TanStack `useQuery` calls in WeChat pages.

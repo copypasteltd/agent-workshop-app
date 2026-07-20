@@ -22,6 +22,16 @@ function listJavaScriptFiles(directory) {
   });
 }
 
+function listSourceFiles(directory) {
+  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const absolutePath = path.join(directory, entry.name);
+    if (entry.isDirectory()) {
+      return listSourceFiles(absolutePath);
+    }
+    return entry.isFile() && /\.(?:ts|tsx)$/.test(entry.name) ? [absolutePath] : [];
+  });
+}
+
 for (const relativePath of requiredFiles) {
   const absolutePath = path.join(distRoot, relativePath);
   if (!statSync(absolutePath).isFile()) {
@@ -91,6 +101,36 @@ if (creatorLaunchPageSource.includes(".useQuery(")) {
   throw new Error("Creator launch capability loading must not depend on useQuery scheduling");
 }
 
+for (const filePath of listSourceFiles(path.join(projectRoot, "src"))) {
+  if (filePath === path.join(projectRoot, "src", "lib", "useMobileQuery.ts")) {
+    continue;
+  }
+  const source = readFileSync(filePath, "utf8");
+  if (
+    /import\s*\{[^}]*\buseQuery\b[^}]*\}\s*from\s*["']@tanstack\/react-query["']/.test(
+      source
+    )
+  ) {
+    throw new Error(
+      `WeChat page queries must use useMobileQuery: ${path.relative(projectRoot, filePath)}`
+    );
+  }
+}
+
+for (const filePath of listJavaScriptFiles(path.join(distRoot, "pages"))) {
+  const source = readFileSync(filePath, "utf8");
+  if (source.includes(".useQuery(")) {
+    throw new Error(
+      `Direct TanStack useQuery call leaked into WeChat page: ${path.relative(distRoot, filePath)}`
+    );
+  }
+}
+
+const commonSource = readFileSync(path.join(distRoot, "common.js"), "utf8");
+if (!commonSource.includes("useMobileQuery")) {
+  throw new Error("Missing the WeChat direct-query compatibility layer");
+}
+
 const sourceProject = JSON.parse(
   readFileSync(path.join(projectRoot, "project.config.json"), "utf8")
 );
@@ -98,6 +138,12 @@ const outputProject = JSON.parse(
   readFileSync(path.join(distRoot, "project.config.json"), "utf8")
 );
 JSON.parse(readFileSync(path.join(distRoot, "app.json"), "utf8"));
+
+if (sourceProject.libVersion !== "3.15.2" || outputProject.libVersion !== "3.15.2") {
+  throw new Error(
+    `WeChat base library must use stable 3.15.2: source=${sourceProject.libVersion}, output=${outputProject.libVersion}`
+  );
+}
 
 if (sourceProject.appid !== outputProject.appid) {
   throw new Error(

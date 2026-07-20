@@ -1,7 +1,7 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMobileQuery as useQuery } from "../../lib/useMobileQuery";
 import { matchesSearchQuery } from "@lingban/domain-models";
 import { Button, Image, Input, View } from "@tarojs/components";
-import Taro, { getCurrentInstance } from "@tarojs/taro";
+import Taro from "@tarojs/taro";
 import { useMemo, useState } from "react";
 import workshopDrama from "../../assets/workshop-drama.svg";
 import workshopImage from "../../assets/workshop-image.svg";
@@ -15,6 +15,7 @@ import {
 } from "../../lib/catalog";
 import { useMobileRecentRecorder } from "../../lib/recent";
 import { useResolvedMobileWorkspace } from "../../lib/useMobileWorkspace";
+import { useMobileRouteParams } from "../../lib/useMobileRouteParams";
 import { hasAuthoritativeMobileWorkspaceContext } from "../../lib/workspaceContext";
 import { useMobilePageShellClass } from "../../components/MobilePageShell";
 
@@ -25,8 +26,16 @@ const workshopCoverMap: Record<string, string> = {
 };
 
 export default function WorkshopDetailPage() {
+  const params = useMobileRouteParams<{ id?: string }>();
   const pageShellClass = useMobilePageShellClass();
-  const id = getCurrentInstance().router?.params?.id;
+  if (!params) {
+    return <View className={pageShellClass}><View className="section-copy">正在加载工坊路由</View></View>;
+  }
+  return <WorkshopDetailContent id={params.id} />;
+}
+
+function WorkshopDetailContent({ id }: { id?: string }) {
+  const pageShellClass = useMobilePageShellClass();
   const [searchQuery, setSearchQuery] = useState("");
   const currentWorkspace = useResolvedMobileWorkspace();
   const workspaceDataReady = hasAuthoritativeMobileWorkspaceContext(currentWorkspace);

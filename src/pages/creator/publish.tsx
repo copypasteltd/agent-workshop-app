@@ -3,9 +3,10 @@ import type {
   CreatorReleaseState,
   WorkspaceRole,
 } from "@lingban/contracts";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button, Input, Textarea, View } from "@tarojs/components";
-import Taro, { getCurrentInstance } from "@tarojs/taro";
+import Taro from "@tarojs/taro";
+import { useMobileQuery as useQuery } from "../../lib/useMobileQuery";
 import { useEffect, useMemo, useState } from "react";
 import { useMobilePageShellClass } from "../../components/MobilePageShell";
 import {
@@ -31,6 +32,7 @@ import {
   resolveMobileCreatorPublishStage,
 } from "../../lib/mobileCreatorFlow";
 import { useResolvedMobileWorkspace } from "../../lib/useMobileWorkspace";
+import { useMobileRouteParams } from "../../lib/useMobileRouteParams";
 import { hasAuthoritativeMobileWorkspaceContext } from "../../lib/workspaceContext";
 
 function roleRank(role: WorkspaceRole | null) {
@@ -70,9 +72,17 @@ function gateTone(status: CreatorReleaseGate["status"]) {
 }
 
 export default function CreatorPublishPage() {
+  const params = useMobileRouteParams<{ id?: string }>();
+  const pageShellClass = useMobilePageShellClass("creator-page-shell");
+  if (!params) {
+    return <View className={pageShellClass}><View className="section-copy">正在加载发布工作台</View></View>;
+  }
+  return <CreatorPublishContent projectId={params.id ?? ""} />;
+}
+
+function CreatorPublishContent({ projectId }: { projectId: string }) {
   const pageShellClass = useMobilePageShellClass("creator-page-shell");
   const queryClient = useQueryClient();
-  const projectId = getCurrentInstance().router?.params?.id ?? "";
   const currentWorkspace = useResolvedMobileWorkspace();
   const workspaceReady = hasAuthoritativeMobileWorkspaceContext(currentWorkspace);
   const creatorAllowed =

@@ -3,9 +3,10 @@ import type {
   SessionPackRedactionStrategy,
   SessionPackRedactionTargetKind,
 } from "@lingban/contracts";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button, Input, Textarea, View } from "@tarojs/components";
-import Taro, { getCurrentInstance } from "@tarojs/taro";
+import Taro from "@tarojs/taro";
+import { useMobileQuery as useQuery } from "../../lib/useMobileQuery";
 import { useEffect, useMemo, useState } from "react";
 import { useMobilePageShellClass } from "../../components/MobilePageShell";
 import {
@@ -15,6 +16,7 @@ import {
 } from "../../lib/api";
 import { canCreateMobileSourceRun, mobileCreatorQueryKeys } from "../../lib/mobileCreator";
 import { useResolvedMobileWorkspace } from "../../lib/useMobileWorkspace";
+import { useMobileRouteParams } from "../../lib/useMobileRouteParams";
 import { hasAuthoritativeMobileWorkspaceContext } from "../../lib/workspaceContext";
 
 function reportArrayCount(value: Record<string, unknown>, key: string) {
@@ -31,11 +33,17 @@ function createRuleId() {
 }
 
 export default function CreatorDraftPage() {
+  const params = useMobileRouteParams<{ id?: string; projectId?: string }>();
+  const pageShellClass = useMobilePageShellClass("creator-page-shell");
+  if (!params) {
+    return <View className={pageShellClass}><View className="section-copy">正在加载固化工作台</View></View>;
+  }
+  return <CreatorDraftContent draftId={params.id ?? ""} projectId={params.projectId ?? ""} />;
+}
+
+function CreatorDraftContent({ draftId, projectId }: { draftId: string; projectId: string }) {
   const pageShellClass = useMobilePageShellClass("creator-page-shell");
   const queryClient = useQueryClient();
-  const params = getCurrentInstance().router?.params;
-  const draftId = params?.id ?? "";
-  const projectId = params?.projectId ?? "";
   const currentWorkspace = useResolvedMobileWorkspace();
   const workspaceReady = hasAuthoritativeMobileWorkspaceContext(currentWorkspace);
   const creatorAllowed =

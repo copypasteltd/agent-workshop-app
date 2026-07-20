@@ -1,7 +1,8 @@
 import { ApiError } from "@lingban/api-sdk";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button, Input, View } from "@tarojs/components";
-import Taro, { getCurrentInstance } from "@tarojs/taro";
+import Taro from "@tarojs/taro";
+import { useMobileQuery as useQuery } from "../../lib/useMobileQuery";
 import { useEffect, useMemo, useState } from "react";
 import { mobileCatalogApi, mobileProvidersApi, mobileRunsApi } from "../../lib/api";
 import {
@@ -13,6 +14,7 @@ import {
 } from "../../lib/catalog";
 import { useMobileRecentRecorder } from "../../lib/recent";
 import { useResolvedMobileWorkspace } from "../../lib/useMobileWorkspace";
+import { useMobileRouteParams } from "../../lib/useMobileRouteParams";
 import { hasAuthoritativeMobileWorkspaceContext } from "../../lib/workspaceContext";
 import { useMobilePageShellClass } from "../../components/MobilePageShell";
 
@@ -44,9 +46,17 @@ type LaunchProviderOption = {
 };
 
 export default function ServiceDetailPage() {
+  const params = useMobileRouteParams<{ id?: string }>();
+  const pageShellClass = useMobilePageShellClass();
+  if (!params) {
+    return <View className={pageShellClass}><View className="section-copy">正在加载服务路由</View></View>;
+  }
+  return <ServiceDetailContent id={params.id} />;
+}
+
+function ServiceDetailContent({ id }: { id?: string }) {
   const pageShellClass = useMobilePageShellClass();
   const queryClient = useQueryClient();
-  const id = getCurrentInstance().router?.params?.id;
   const currentWorkspace = useResolvedMobileWorkspace();
   const workspaceDataReady = hasAuthoritativeMobileWorkspaceContext(currentWorkspace);
   const entrySurface = resolveMobileEntrySurface();

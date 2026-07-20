@@ -1,7 +1,8 @@
 import type { NotificationRecord } from "@lingban/contracts";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button, Image, Input, View } from "@tarojs/components";
 import Taro from "@tarojs/taro";
+import { useMobileQuery as useQuery } from "../../lib/useMobileQuery";
 import { useMemo, useState } from "react";
 import {
   mobileAuthApi,

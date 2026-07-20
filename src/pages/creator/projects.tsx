@@ -1,5 +1,5 @@
 import type { SessionProjectStatus } from "@lingban/contracts";
-import { useQuery } from "@tanstack/react-query";
+import { useMobileQuery as useQuery } from "../../lib/useMobileQuery";
 import { Button, Input, View } from "@tarojs/components";
 import Taro from "@tarojs/taro";
 import { useMemo, useState } from "react";

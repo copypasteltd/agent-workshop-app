@@ -1,8 +1,9 @@
 import type { SearchResourceType, SearchResultRecord } from "@lingban/contracts";
 import { matchesSearchQuery } from "@lingban/domain-models";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button, Image, Input, View } from "@tarojs/components";
 import Taro from "@tarojs/taro";
+import { useMobileQuery as useQuery } from "../../lib/useMobileQuery";
 import { useDeferredValue, useMemo, useState } from "react";
 import workshopDrama from "../../assets/workshop-drama.svg";
 import workshopImage from "../../assets/workshop-image.svg";

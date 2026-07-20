@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { useQuery, type UseQueryResult } from "@tanstack/react-query";
+import type { UseQueryResult } from "@tanstack/react-query";
 import type { MobileService, MobileTask, MobileWorkshop } from "../data/mobileData";
 import { mobileCatalogApi, mobileMeApi, mobileRunsApi } from "./api";
 import {
@@ -8,6 +8,7 @@ import {
   resolveMobileEntrySurface,
 } from "./catalog";
 import { mapRunSnapshotToMobileTask } from "./liveTaskAdapters";
+import { useMobileQuery as useQuery } from "./useMobileQuery";
 import {
   hasAuthoritativeMobileWorkspaceContext,
   type MobileWorkspaceView,
