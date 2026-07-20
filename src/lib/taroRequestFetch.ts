@@ -1,4 +1,5 @@
 import Taro from "@tarojs/taro";
+import { MOBILE_REQUEST_TIMEOUT_MS } from "./mobileNetwork";
 
 type HeaderRecord = Record<string, string>;
 
@@ -168,6 +169,7 @@ export const taroRequestFetch: typeof fetch = ((
     let settled = false;
     const requestTask = Taro.request<string | TaroGeneral.IAnyObject | ArrayBuffer>({
       url,
+      timeout: MOBILE_REQUEST_TIMEOUT_MS,
       method: (init?.method?.toUpperCase() ?? "GET") as keyof Taro.request.Method,
       header: normalizeRequestHeaders(init?.headers),
       data: requestBodyToTaroData(init?.body),

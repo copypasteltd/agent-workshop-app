@@ -124,10 +124,22 @@ export default function NewTaskPage() {
   const capabilityError =
     providersQuery.error ?? providerBindingsQuery.error ?? mcpsQuery.error ??
     mcpBindingsQuery.error ?? credentialsQuery.error;
+  const capabilityLoading =
+    providersQuery.isPending || providerBindingsQuery.isPending || mcpsQuery.isPending ||
+    mcpBindingsQuery.isPending || credentialsQuery.isPending;
   const capabilityReady =
     providersQuery.isSuccess && providerBindingsQuery.isSuccess && mcpsQuery.isSuccess &&
     mcpBindingsQuery.isSuccess && credentialsQuery.isSuccess;
   const providerReady = providerOptions.length > 0;
+  const reloadCapabilities = () => {
+    void Promise.all([
+      providersQuery.refetch(),
+      providerBindingsQuery.refetch(),
+      mcpsQuery.refetch(),
+      mcpBindingsQuery.refetch(),
+      credentialsQuery.refetch(),
+    ]);
+  };
 
   const createMutation = useMutation({
     mutationFn: async () => {
@@ -222,7 +234,9 @@ export default function NewTaskPage() {
     draft.name.trim().length > 0 && capabilityReady && providerReady && !createMutation.isPending;
   const submitLabel = createMutation.isPending
     ? createStage === "project" ? "正在创建项目" : "正在启动 Codex"
-    : !capabilityReady ? "正在加载运行能力"
+    : capabilityError ? "运行能力加载失败"
+    : capabilityLoading ? "正在加载运行能力"
+    : !capabilityReady ? "运行能力不可用"
     : !providerReady ? "需要 Provider 路由"
     : "启动空白 Codex";
 
@@ -273,7 +287,13 @@ export default function NewTaskPage() {
             <View className="creator-note">默认路由支持一键启动</View>
           </View>
           <View className={`pill ${providerReady ? "success" : "warn"}`}>
-            {providerReady ? `${providerOptions.length} 条路由` : "未配置"}
+            {providerReady
+              ? `${providerOptions.length} 条路由`
+              : capabilityError
+                ? "加载失败"
+                : capabilityLoading
+                  ? "加载中"
+                  : "未配置"}
           </View>
         </View>
         <View className="creator-choice-list">
@@ -324,6 +344,7 @@ export default function NewTaskPage() {
             />
           </View>
           <View className="creator-subsection-title">MCP</View>
+          {mcpsQuery.isPending ? <View className="creator-note">正在加载 MCP...</View> : null}
           {(mcpsQuery.data ?? []).map((entry) => <View className="creator-toggle-row" key={entry.mcpId}>
             <View className="creator-toggle-content"><View className="creator-field-label">{entry.displayName}</View><View className="creator-note">{entry.source} / {entry.transport} / {entry.riskLevel}</View></View>
             <Switch
@@ -332,8 +353,10 @@ export default function NewTaskPage() {
               onChange={(event) => toggleMcp(entry.mcpId, event.detail.value)}
             />
           </View>)}
-          {!mcpsQuery.isLoading && !mcpsQuery.data?.length ? <View className="creator-note">当前工作区没有可用 MCP。</View> : null}
+          {!mcpsQuery.isPending && !mcpsQuery.error && !mcpsQuery.data?.length ? <View className="creator-note">当前工作区没有可用 MCP。</View> : null}
+          {mcpBindingsQuery.isPending ? <View className="creator-note">正在加载默认能力绑定...</View> : null}
           <View className="creator-subsection-title">Credential 引用</View>
+          {credentialsQuery.isPending ? <View className="creator-note">正在加载 Credential 引用...</View> : null}
           {(credentialsQuery.data ?? []).map((credential) => <View className="creator-toggle-row" key={credential.credentialId}>
             <View className="creator-toggle-content"><View className="creator-field-label">{credential.displayName}</View><View className="creator-note">{credential.provider} / {credential.mountMode}</View></View>
             <Switch
@@ -342,13 +365,16 @@ export default function NewTaskPage() {
               onChange={(event) => toggleCredential(credential.credentialId, event.detail.value)}
             />
           </View>)}
-          {!credentialsQuery.isLoading && !credentialsQuery.data?.length ? <View className="creator-note">当前工作区没有可选凭证。</View> : null}
+          {!credentialsQuery.isPending && !credentialsQuery.error && !credentialsQuery.data?.length ? <View className="creator-note">当前工作区没有可选凭证。</View> : null}
           <View className="creator-security-note">仅保存能力和凭证引用，Secret 明文由 Credential Broker 注入实例。</View>
         </View> : null}
       </View>
 
       {draft.sessionProjectId ? <View className="creator-resume-note">已创建 Session Project：{draft.sessionProjectId}。重试将继续启动同一个 Source Run。</View> : null}
-      {capabilityError ? <View className="inline-error-banner">运行能力配置加载失败，请返回后重试。</View> : null}
+      {capabilityError ? <View className="inline-error-banner creator-capability-error">
+        <View>运行能力配置加载失败。请检查网络后重新加载。</View>
+        <Button className="creator-inline-retry" onClick={reloadCapabilities}>重新加载</Button>
+      </View> : null}
       {!providerReady && capabilityReady ? <View className="inline-error-banner">当前工作区没有有效 Provider 路由，请先在管理端完成绑定。</View> : null}
       {createMutation.error ? <View className="inline-error-banner">{createMutation.error instanceof Error ? createMutation.error.message : "实例创建失败"}</View> : null}
 

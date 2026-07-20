@@ -6,6 +6,17 @@ import {
   resolveMobileCreatorProjectAction,
   resolveMobileCreatorPublishStage,
 } from "../src/lib/mobileCreatorFlow.ts";
+import {
+  MOBILE_REQUEST_TIMEOUT_MS,
+  resolveMobileNetworkMode,
+} from "../src/lib/mobileNetwork.ts";
+
+test("WeChat queries bypass the browser online manager and requests have a finite timeout", () => {
+  assert.equal(resolveMobileNetworkMode("weapp"), "always");
+  assert.equal(resolveMobileNetworkMode("h5"), "online");
+  assert.equal(resolveMobileNetworkMode(undefined), "online");
+  assert.equal(MOBILE_REQUEST_TIMEOUT_MS, 20_000);
+});
 
 test("creator project action follows the source, draft, seal, and publication lifecycle", () => {
   assert.deepEqual(

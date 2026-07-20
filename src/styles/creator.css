@@ -246,6 +246,32 @@
   line-height: 1.6;
 }
 
+.creator-capability-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.creator-inline-retry {
+  flex: 0 0 auto;
+  min-height: 34px;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0 11px;
+  border: 1px solid var(--danger, #ef6b73);
+  border-radius: 6px;
+  color: var(--text, #edf1f7);
+  background: var(--surface, #12161c);
+  font-size: 12px;
+  line-height: 32px;
+}
+
+.creator-inline-retry::after {
+  display: none;
+  border: 0;
+}
+
 .creator-footer-actions {
   position: static;
   padding: 4px 0 calc(8px + env(safe-area-inset-bottom));
