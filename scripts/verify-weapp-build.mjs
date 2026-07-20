@@ -101,6 +101,33 @@ if (creatorLaunchPageSource.includes(".useQuery(")) {
   throw new Error("Creator launch capability loading must not depend on useQuery scheduling");
 }
 
+const taskDetailPageSource = readFileSync(
+  path.join(distRoot, "pages", "tasks", "detail.js"),
+  "utf8"
+);
+for (const marker of [
+  "mobile-task-composer-toggle",
+  "composer-collapsed",
+  "composer-expanded",
+  "task-composer-chevron",
+]) {
+  if (!taskDetailPageSource.includes(marker)) {
+    throw new Error(`Missing collapsible task composer marker: ${marker}`);
+  }
+}
+
+const appStyleSource = readFileSync(path.join(distRoot, "app-origin.wxss"), "utf8");
+for (const marker of [
+  "--task-composer-reserve",
+  "--task-composer-expanded-reserve",
+  "height:176rpx!important",
+  "scroll-padding-bottom:calc(var(--task-composer-reserve)",
+]) {
+  if (!appStyleSource.includes(marker)) {
+    throw new Error(`Missing task composer layout constraint: ${marker}`);
+  }
+}
+
 for (const filePath of listSourceFiles(path.join(projectRoot, "src"))) {
   if (filePath === path.join(projectRoot, "src", "lib", "useMobileQuery.ts")) {
     continue;

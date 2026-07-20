@@ -24,6 +24,7 @@ import {
 } from "../../lib/billing";
 import { mobileBillingApi, mobileQuotaApi, mobileRunsApi, mobileSessionCapturesApi } from "../../lib/api";
 import archiveIcon from "../../assets/archive.svg";
+import chevronDownIcon from "../../assets/chevron-down.svg";
 import { isLiveTaskId, mapRunSnapshotToMobileTask } from "../../lib/liveTaskAdapters";
 import {
   formatQuotaValue,
@@ -715,6 +716,7 @@ function TaskDetailContent({ id }: { id?: string }) {
   ]);
 
   const [summaryOpen, setSummaryOpen] = useState(false);
+  const [composerExpanded, setComposerExpanded] = useState(false);
   const [reviewError, setReviewError] = useState("");
   const [reviewFormsByAnswerId, setReviewFormsByAnswerId] = useState<
     Record<string, ReviewFormState>
@@ -794,6 +796,7 @@ function TaskDetailContent({ id }: { id?: string }) {
     }
 
     setTaskDraft(task.id, value);
+    setComposerExpanded(true);
   };
   const setTaskAttachments = (taskId: string, next: BrowserAttachmentDraft[]) => {
     setAttachmentDraftsByTask((current) => ({
@@ -876,6 +879,7 @@ function TaskDetailContent({ id }: { id?: string }) {
   useEffect(() => {
     setReviewError("");
     setReviewFormsByAnswerId({});
+    setComposerExpanded(false);
   }, [task?.id]);
 
   const displayedMessages = useMemo<DisplayedTaskMessage[]>(() => {
@@ -966,6 +970,7 @@ function TaskDetailContent({ id }: { id?: string }) {
         clearTaskDraft(variables.taskId);
       }
       clearTaskAttachments(variables.taskId);
+      setComposerExpanded(false);
 
       if (!variables.taskId) {
         return;
@@ -1301,7 +1306,10 @@ function TaskDetailContent({ id }: { id?: string }) {
   }
 
   return (
-    <View className={pageShellClass} data-testid="mobile-task-detail-page">
+    <View
+      className={`${pageShellClass} ${composerExpanded ? "composer-expanded" : "composer-collapsed"}`}
+      data-testid="mobile-task-detail-page"
+    >
       <View className="crumb-row">
         <Button className="crumb-btn" onClick={() => Taro.navigateBack()}>
           返回任务列表
@@ -2015,24 +2023,52 @@ function TaskDetailContent({ id }: { id?: string }) {
         ))}
       </View>
 
-      <View className="composer task-composer" data-testid="mobile-task-composer">
-        <>
-            <View className="task-composer-head">
-              <View className="task-composer-title">继续对话</View>
-              <View
-                className={`task-connection-state ${runStream.connected ? "online" : ""}`}
-                data-testid="mobile-task-connection-state"
-              >
-                <View className="task-connection-dot" />
-                {runStream.connected ? "实时连接" : "正在连接"}
+      <View
+        className={`composer task-composer ${composerExpanded ? "expanded" : "collapsed"}`}
+        data-testid="mobile-task-composer"
+      >
+        <Button
+          className="task-composer-toggle"
+          data-testid="mobile-task-composer-toggle"
+          aria-expanded={composerExpanded}
+          onClick={() => setComposerExpanded((current) => !current)}
+        >
+          <View className="task-composer-title-group">
+            <View className="task-composer-title">继续对话</View>
+            {!composerExpanded ? (
+              <View className="task-composer-preview">
+                {draft.trim()
+                  ? draft.trim()
+                  : attachmentDrafts.length > 0
+                    ? `已选择 ${attachmentDrafts.length} 个附件`
+                    : "点按展开输入"}
               </View>
+            ) : null}
+          </View>
+          <View className="task-composer-head-actions">
+            <View
+              className={`task-connection-state ${runStream.connected ? "online" : ""}`}
+              data-testid="mobile-task-connection-state"
+            >
+              <View className="task-connection-dot" />
+              {runStream.connected ? "实时连接" : "正在连接"}
             </View>
+            <Image
+              className={`task-composer-chevron ${composerExpanded ? "expanded" : "collapsed"}`}
+              src={chevronDownIcon}
+              mode="aspectFit"
+            />
+          </View>
+        </Button>
+        {composerExpanded ? (
+          <>
             <Textarea
               className="composer-box composer-input task-composer-input"
               data-testid="mobile-task-composer-input"
               value={draft}
               maxlength={2000}
               placeholder="继续提问、补充材料说明，或者告诉 Codex 下一步要做什么"
+              onFocus={() => setComposerExpanded(true)}
               onInput={(event) => {
                 if (!task) {
                   return;
@@ -2148,6 +2184,7 @@ function TaskDetailContent({ id }: { id?: string }) {
               </Button>
             </View>
           </>
+        ) : null}
       </View>
 
       {captureSheetOpen ? (
