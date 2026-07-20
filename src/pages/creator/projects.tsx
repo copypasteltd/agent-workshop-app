@@ -106,8 +106,8 @@ export default function CreatorProjectsPage() {
         </View>
 
         <View className="creator-context-band">
-          <View><View className="summary-label">工作区</View><View className="summary-value">{currentWorkspace.name}</View></View>
-          <View><View className="summary-label">项目总数</View><View className="summary-value">{projectsQuery.data?.total ?? 0}</View></View>
+          <View className="creator-context-item"><View className="summary-label">工作区</View><View className="summary-value">{currentWorkspace.name}</View></View>
+          <View className="creator-context-item"><View className="summary-label">项目总数</View><View className="summary-value">{projectsQuery.data?.total ?? 0}</View></View>
         </View>
 
         <View className="search-bar">
@@ -171,11 +171,11 @@ export default function CreatorProjectsPage() {
               </View>
               <View className="section-copy">{project.description || "尚未填写项目说明"}</View>
               <View className="creator-project-progress">
-                <View className={project.sourceRunId ? "done" : ""}>实例</View>
-                <View className={project.currentDraftId ? "done" : ""}>草稿</View>
-                <View className={project.currentSessionVersionId ? "done" : ""}>版本</View>
-                <View className={project.packageId ? "done" : ""}>封装</View>
-                <View className={project.status === "PUBLISHED" ? "done" : ""}>发布</View>
+                <View className={`creator-progress-step ${project.sourceRunId ? "done" : ""}`}>实例</View>
+                <View className={`creator-progress-step ${project.currentDraftId ? "done" : ""}`}>草稿</View>
+                <View className={`creator-progress-step ${project.currentSessionVersionId ? "done" : ""}`}>版本</View>
+                <View className={`creator-progress-step ${project.packageId ? "done" : ""}`}>封装</View>
+                <View className={`creator-progress-step ${project.status === "PUBLISHED" ? "done" : ""}`}>发布</View>
               </View>
               <View className="mono creator-project-id">{project.sessionProjectId}</View>
             </View>

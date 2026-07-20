@@ -238,8 +238,8 @@ export default function NewTaskPage() {
       </View>
 
       <View className="creator-context-band">
-        <View><View className="summary-label">工作区</View><View className="summary-value">{currentWorkspace.name}</View></View>
-        <View><View className="summary-label">默认目录</View><View className="summary-value mono">{currentWorkspace.root}</View></View>
+        <View className="creator-context-item"><View className="summary-label">工作区</View><View className="summary-value">{currentWorkspace.name}</View></View>
+        <View className="creator-context-item"><View className="summary-label">默认目录</View><View className="summary-value mono">{currentWorkspace.root}</View></View>
       </View>
 
       <View className="creator-form-section">
@@ -313,7 +313,7 @@ export default function NewTaskPage() {
         </Button>
         {advancedOpen ? <View className="creator-advanced-body">
           <View className="creator-toggle-row">
-            <View><View className="creator-field-label">全自动审批</View><View className="creator-note">实例中的审批请求自动通过</View></View>
+            <View className="creator-toggle-content"><View className="creator-field-label">全自动审批</View><View className="creator-note">实例中的审批请求自动通过</View></View>
             <Switch
               checked={draft.approvalMode === "auto_all"}
               color="#5366eb"
@@ -325,7 +325,7 @@ export default function NewTaskPage() {
           </View>
           <View className="creator-subsection-title">MCP</View>
           {(mcpsQuery.data ?? []).map((entry) => <View className="creator-toggle-row" key={entry.mcpId}>
-            <View><View className="creator-field-label">{entry.displayName}</View><View className="creator-note">{entry.source} / {entry.transport} / {entry.riskLevel}</View></View>
+            <View className="creator-toggle-content"><View className="creator-field-label">{entry.displayName}</View><View className="creator-note">{entry.source} / {entry.transport} / {entry.riskLevel}</View></View>
             <Switch
               checked={draft.selectedMcpIds.includes(entry.mcpId)}
               color="#5366eb"
@@ -335,7 +335,7 @@ export default function NewTaskPage() {
           {!mcpsQuery.isLoading && !mcpsQuery.data?.length ? <View className="creator-note">当前工作区没有可用 MCP。</View> : null}
           <View className="creator-subsection-title">Credential 引用</View>
           {(credentialsQuery.data ?? []).map((credential) => <View className="creator-toggle-row" key={credential.credentialId}>
-            <View><View className="creator-field-label">{credential.displayName}</View><View className="creator-note">{credential.provider} / {credential.mountMode}</View></View>
+            <View className="creator-toggle-content"><View className="creator-field-label">{credential.displayName}</View><View className="creator-note">{credential.provider} / {credential.mountMode}</View></View>
             <Switch
               checked={draft.selectedCredentialIds.includes(credential.credentialId)}
               color="#5366eb"

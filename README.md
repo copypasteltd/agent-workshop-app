@@ -146,3 +146,11 @@ Credentialed WeChat device testing, file APIs, subscription messages, and review
 `pnpm typecheck`、Creator Flow `4/4`、H5 production build、WeChat production build 和 `scripts/verify-weapp-build.mjs` 均通过。微信开发者工具导入仓库根路径，`miniprogramRoot` 指向 `dist/`。
 
 The mobile client now exposes blank Codex creation and the complete Creator publication path. Type checking, creator-flow tests, H5 build, and WeChat artifact verification pass.
+
+## 2026-07-21 Dark Theme Compatibility / 2026-07-21 暗色主题兼容
+
+Creator 新增页面已完成 H5 与微信小程序暗色主题统一：工作区摘要、表单控件、运行能力折叠区、开关行、底部操作区和禁用按钮均使用显式组件类与稳定尺寸。关键布局不依赖微信构建可能省略的通配子选择器，Taro `Button` 原生背景、边框和伪元素已统一重置。
+
+360x800、390x844、430x932 暗色视口均无横向溢出，运行能力入口保持深色背景，底部操作区按正常文档流排列。交付微信开发者工具前必须最后执行 `pnpm build:weapp`，确保 `dist/` 保留微信小程序产物。
+
+The Creator pages now apply explicit cross-platform component classes, stable form dimensions, native Taro button resets, and normal-flow footer actions. Dark-theme layout checks pass at 360x800, 390x844, and 430x932 without horizontal overflow.

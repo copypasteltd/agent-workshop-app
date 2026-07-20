@@ -203,8 +203,8 @@ export default function CreatorDraftPage() {
         </View>
 
         <View className="creator-context-band">
-          <View><View className="summary-label">Draft 版本</View><View className="summary-value">v{detail.draft.version}</View></View>
-          <View><View className="summary-label">Capture</View><View className="summary-value mono">{detail.draft.sourceCaptureId}</View></View>
+          <View className="creator-context-item"><View className="summary-label">Draft 版本</View><View className="summary-value">v{detail.draft.version}</View></View>
+          <View className="creator-context-item"><View className="summary-label">Capture</View><View className="summary-value mono">{detail.draft.sourceCaptureId}</View></View>
         </View>
 
         <View className="creator-form-section">
@@ -214,7 +214,7 @@ export default function CreatorDraftPage() {
           </View>
           {rules.map((rule, index) => (
             <View className="creator-rule-row" key={rule.ruleId}>
-              <View><View className="file-name">{rule.targetKind} / {rule.strategy}</View><View className="file-meta mono">{rule.selector}</View></View>
+              <View className="creator-row-main"><View className="file-name">{rule.targetKind} / {rule.strategy}</View><View className="file-meta mono">{rule.selector}</View></View>
               <Button className="pill" disabled={sealed} onClick={() => setRules((current) => current.filter((_, itemIndex) => itemIndex !== index))}>移除</Button>
             </View>
           ))}
@@ -242,9 +242,9 @@ export default function CreatorDraftPage() {
         <View className="creator-form-section">
           <View className="creator-section-head"><View><View className="creator-section-title">02 安全审核</View><View className="creator-note">检查敏感内容与 Pack 完整性</View></View><View className={`pill ${secure ? "success" : "warn"}`}>{latestRevision ? secure ? "PASSED" : "ACTION REQUIRED" : "WAITING"}</View></View>
           <View className="creator-record-grid">
-            <View><View className="summary-label">Revision</View><View className="summary-value mono">{latestRevision?.revisionId ?? "--"}</View></View>
-            <View><View className="summary-label">敏感项</View><View className="summary-value">{findings}</View></View>
-            <View><View className="summary-label">Pack 问题</View><View className="summary-value">{packIssues}</View></View>
+            <View className="creator-record-cell"><View className="summary-label">Revision</View><View className="summary-value mono">{latestRevision?.revisionId ?? "--"}</View></View>
+            <View className="creator-record-cell"><View className="summary-label">敏感项</View><View className="summary-value">{findings}</View></View>
+            <View className="creator-record-cell"><View className="summary-label">Pack 问题</View><View className="summary-value">{packIssues}</View></View>
             <View><View className="summary-label">最近审核</View><View className="summary-value">{latestReview?.decision ?? "--"}</View></View>
           </View>
           <Textarea className="creator-textarea" value={reviewNote} maxlength={4000} placeholder="审核说明" onInput={(event) => setReviewNote(event.detail.value)} />
@@ -257,7 +257,7 @@ export default function CreatorDraftPage() {
         <View className="creator-form-section">
           <View className="creator-section-head"><View><View className="creator-section-title">03 恢复验证</View><View className="creator-note">重建工作区并核对文件与事件流</View></View><View className={`pill ${latestReplay?.status === "passed" ? "success" : latestReplay?.status === "failed" ? "warn" : ""}`}>{latestReplay?.status ?? "NOT RUN"}</View></View>
           {latestReplay ? <View className="creator-check-list">
-            {latestReplay.checks.map((check) => <View className="creator-check-row" key={check.checkId}><View><View className="file-name">{check.checkId}</View><View className="file-meta">{check.detail}</View></View><View className={`pill ${check.status === "passed" ? "success" : "warn"}`}>{check.status}</View></View>)}
+            {latestReplay.checks.map((check) => <View className="creator-check-row" key={check.checkId}><View className="creator-row-main"><View className="file-name">{check.checkId}</View><View className="file-meta">{check.detail}</View></View><View className={`pill ${check.status === "passed" ? "success" : "warn"}`}>{check.status}</View></View>)}
           </View> : null}
           <Button className="creator-primary-btn creator-full-btn" disabled={detail.draft.status !== "ready_to_seal" || sealed || replayMutation.isPending} onClick={() => replayMutation.mutate()}>{replayMutation.isPending ? "正在恢复验证" : "执行恢复验证"}</Button>
         </View>

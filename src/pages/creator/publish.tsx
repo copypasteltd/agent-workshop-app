@@ -331,10 +331,10 @@ export default function CreatorPublishPage() {
             </View>
             <Button className="creator-primary-btn creator-full-btn" disabled={!project.currentSessionVersionId || !packageFormValid || packageMutation.isPending} onClick={() => packageMutation.mutate()}>{packageMutation.isPending ? "正在封装" : "创建工坊服务并封装"}</Button>
           </> : <View className="creator-record-grid">
-            <View><View className="summary-label">Package</View><View className="summary-value mono">{project.packageId}</View></View>
-            <View><View className="summary-label">Workshop</View><View className="summary-value mono">{project.workshopId}</View></View>
-            <View><View className="summary-label">Service</View><View className="summary-value mono">{project.serviceId}</View></View>
-            <View><View className="summary-label">Session Version</View><View className="summary-value mono">{project.currentSessionVersionId}</View></View>
+            <View className="creator-record-cell"><View className="summary-label">Package</View><View className="summary-value mono">{project.packageId}</View></View>
+            <View className="creator-record-cell"><View className="summary-label">Workshop</View><View className="summary-value mono">{project.workshopId}</View></View>
+            <View className="creator-record-cell"><View className="summary-label">Service</View><View className="summary-value mono">{project.serviceId}</View></View>
+            <View className="creator-record-cell"><View className="summary-label">Session Version</View><View className="summary-value mono">{project.currentSessionVersionId}</View></View>
           </View>}
         </View>
 
@@ -346,9 +346,9 @@ export default function CreatorPublishPage() {
             </View>
             <Button className="creator-primary-btn creator-full-btn" disabled={!packageReady || releaseMutation.isPending} onClick={() => releaseMutation.mutate()}>{releaseMutation.isPending ? "正在创建 Release" : "创建 Release"}</Button>
           </> : <View className="creator-record-grid">
-            <View><View className="summary-label">Release ID</View><View className="summary-value mono">{latestRelease.releaseId}</View></View>
-            <View><View className="summary-label">发布通道</View><View className="summary-value">{latestRelease.channelLabel.zh}</View></View>
-            <View><View className="summary-label">目标工作区</View><View className="summary-value mono">{latestRelease.targetWorkspaceContextKey}</View></View>
+            <View className="creator-record-cell"><View className="summary-label">Release ID</View><View className="summary-value mono">{latestRelease.releaseId}</View></View>
+            <View className="creator-record-cell"><View className="summary-label">发布通道</View><View className="summary-value">{latestRelease.channelLabel.zh}</View></View>
+            <View className="creator-record-cell"><View className="summary-label">目标工作区</View><View className="summary-value mono">{latestRelease.targetWorkspaceContextKey}</View></View>
           </View>}
         </View>
 

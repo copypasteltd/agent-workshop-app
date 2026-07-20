@@ -52,10 +52,12 @@
   background: var(--line);
 }
 
-.creator-context-band > * {
+.creator-context-item {
   min-width: 0;
+  min-height: 62px;
+  box-sizing: border-box;
   padding: 11px 12px;
-  background: var(--surface);
+  background: var(--surface, #12161c);
 }
 
 .creator-context-band .summary-value {
@@ -109,18 +111,25 @@
 .creator-input,
 .creator-textarea {
   width: 100%;
-  min-height: 42px;
+  box-sizing: border-box;
   padding: 10px 11px;
-  border: 1px solid var(--line-strong);
+  border: 1px solid var(--line-strong, #394350);
   border-radius: 6px;
-  color: var(--text);
-  background: var(--surface-2);
+  color: var(--text, #edf1f7);
+  background: var(--surface-2, #0f141b);
   font-size: 12px;
   line-height: 1.5;
 }
 
+.creator-input {
+  height: 46px;
+  min-height: 46px;
+}
+
 .creator-textarea {
-  min-height: 82px;
+  height: 112px;
+  min-height: 112px;
+  max-height: 112px;
 }
 
 .creator-choice-list,
@@ -139,13 +148,13 @@
 
 .creator-choice,
 .creator-model {
-  width: max-content !important;
+  width: auto !important;
   margin: 0 !important;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   min-height: 34px;
-  flex: 0 0 max-content;
+  flex: 0 0 auto;
   padding: 0 11px;
   border: 1px solid var(--line);
   border-radius: 6px;
@@ -169,8 +178,25 @@
 .creator-advanced-trigger {
   width: 100%;
   min-height: 62px;
+  box-sizing: border-box;
+  margin: 0;
   padding: 12px 14px;
+  border: 0;
+  border-radius: 0;
+  color: var(--text, #edf1f7);
+  background: var(--surface, #12161c);
+  font: inherit;
+  line-height: 1.2;
   text-align: left;
+}
+
+.creator-advanced-trigger::after,
+.creator-secondary-btn::after,
+.creator-primary-btn::after,
+.creator-choice::after,
+.creator-model::after {
+  display: none;
+  border: 0;
 }
 
 .creator-chevron {
@@ -203,13 +229,15 @@
   border-top: 1px solid var(--line);
 }
 
-.creator-toggle-row > *:first-child {
+.creator-toggle-content {
   min-width: 0;
+  flex: 1 1 auto;
 }
 
 .creator-security-note,
 .creator-resume-note {
   padding: 10px 12px;
+  border: 1px solid var(--line, #272d36);
   border: 1px solid color-mix(in srgb, var(--accent) 26%, var(--line));
   border-radius: 6px;
   color: var(--muted);
@@ -219,15 +247,15 @@
 }
 
 .creator-footer-actions {
-  position: sticky;
-  bottom: 0;
-  z-index: 4;
-  padding: 10px 0 calc(6px + env(safe-area-inset-bottom));
-  background: color-mix(in srgb, var(--bg) 94%, transparent);
+  position: static;
+  padding: 4px 0 calc(8px + env(safe-area-inset-bottom));
+  background: transparent;
 }
 
 .creator-secondary-btn,
 .creator-primary-btn {
+  box-sizing: border-box;
+  margin: 0;
   min-height: 44px;
   border-radius: 7px;
   font-size: 13px;
@@ -236,9 +264,9 @@
 
 .creator-secondary-btn {
   width: 34%;
-  color: var(--muted);
-  border: 1px solid var(--line);
-  background: var(--surface);
+  color: var(--muted, #8993a1);
+  border: 1px solid var(--line, #272d36);
+  background: var(--surface, #12161c);
 }
 
 .creator-primary-btn {
@@ -249,7 +277,27 @@
 }
 
 .creator-primary-btn[disabled]:not([disabled="false"]) {
-  opacity: 0.46;
+  color: #929ac8;
+  border-color: #303966;
+  background: #252d50;
+  opacity: 1;
+}
+
+.theme-light .creator-primary-btn[disabled]:not([disabled="false"]) {
+  color: #78849a;
+  border-color: #c8d1de;
+  background: #dde3ee;
+}
+
+.creator-footer-actions .creator-secondary-btn {
+  width: auto;
+  flex: 0 0 34%;
+}
+
+.creator-footer-actions .creator-primary-btn {
+  width: auto;
+  min-width: 0;
+  flex: 1 1 0;
 }
 
 .creator-empty {
@@ -283,7 +331,7 @@
   gap: 5px;
 }
 
-.creator-project-progress > * {
+.creator-progress-step {
   min-width: 0;
   padding: 5px 2px;
   border-top: 2px solid var(--line-strong);
@@ -292,7 +340,7 @@
   text-align: center;
 }
 
-.creator-project-progress > *.done {
+.creator-progress-step.done {
   color: var(--success);
   border-color: var(--success);
 }
@@ -351,10 +399,11 @@
   background: var(--line);
 }
 
-.creator-record-grid > * {
+.creator-record-cell {
   min-width: 0;
+  box-sizing: border-box;
   padding: 10px;
-  background: var(--surface-2);
+  background: var(--surface-2, #0f141b);
 }
 
 .creator-record-grid .summary-value {
@@ -389,8 +438,7 @@
   border-top: 1px solid var(--line);
 }
 
-.creator-rule-row > *:first-child,
-.creator-check-row > *:first-child,
+.creator-row-main,
 .creator-gate-main {
   min-width: 0;
   flex: 1 1 auto;

@@ -184,9 +184,9 @@ export default function CreatorProjectPage() {
             <View className="creator-field"><View className="creator-field-label">说明</View><Textarea className="creator-textarea" value={description} maxlength={4000} onInput={(event) => setDescription(event.detail.value)} /></View>
             <Button className="creator-primary-btn creator-full-btn" disabled={!name.trim() || updateMutation.isPending} onClick={() => updateMutation.mutate()}>{updateMutation.isPending ? "保存中" : "保存"}</Button>
           </> : <View className="creator-record-grid">
-            <View><View className="summary-label">Project ID</View><View className="summary-value mono">{project.sessionProjectId}</View></View>
-            <View><View className="summary-label">更新时间</View><View className="summary-value">{formatTime(project.updatedAt)}</View></View>
-            <View><View className="summary-label">Source Run</View><View className="summary-value mono">{project.sourceRunId ?? "--"}</View></View>
+            <View className="creator-record-cell"><View className="summary-label">Project ID</View><View className="summary-value mono">{project.sessionProjectId}</View></View>
+            <View className="creator-record-cell"><View className="summary-label">更新时间</View><View className="summary-value">{formatTime(project.updatedAt)}</View></View>
+            <View className="creator-record-cell"><View className="summary-label">Source Run</View><View className="summary-value mono">{project.sourceRunId ?? "--"}</View></View>
             <View><View className="summary-label">当前 Revision</View><View className="summary-value mono">{latestRevision?.revisionId ?? "--"}</View></View>
           </View>}
           {updateMutation.error ? <View className="inline-error-banner">{updateMutation.error.message}</View> : null}
@@ -195,18 +195,18 @@ export default function CreatorProjectPage() {
         {project.currentDraftId ? <View className="creator-form-section">
           <View className="creator-section-head"><View className="creator-section-title">固化状态</View><View className={`pill ${latestReplay?.status === "passed" ? "success" : "active"}`}>{draftQuery.data?.draft.status ?? "加载中"}</View></View>
           <View className="creator-record-grid">
-            <View><View className="summary-label">Draft</View><View className="summary-value mono">{project.currentDraftId}</View></View>
-            <View><View className="summary-label">Replay</View><View className="summary-value">{latestReplay?.status ?? "尚未执行"}</View></View>
-            <View><View className="summary-label">Session Version</View><View className="summary-value mono">{project.currentSessionVersionId ?? "--"}</View></View>
+            <View className="creator-record-cell"><View className="summary-label">Draft</View><View className="summary-value mono">{project.currentDraftId}</View></View>
+            <View className="creator-record-cell"><View className="summary-label">Replay</View><View className="summary-value">{latestReplay?.status ?? "尚未执行"}</View></View>
+            <View className="creator-record-cell"><View className="summary-label">Session Version</View><View className="summary-value mono">{project.currentSessionVersionId ?? "--"}</View></View>
           </View>
         </View> : null}
 
         {project.packageId ? <View className="creator-form-section">
           <View className="creator-section-head"><View className="creator-section-title">发布资产</View><View className={`pill ${packageQuery.data?.tone ?? ""}`}>{packageQuery.data?.statusLabel.zh ?? "加载中"}</View></View>
           <View className="creator-record-grid">
-            <View><View className="summary-label">Package</View><View className="summary-value mono">{project.packageId}</View></View>
-            <View><View className="summary-label">Release</View><View className="summary-value mono">{latestRelease?.releaseId ?? "--"}</View></View>
-            <View><View className="summary-label">Channel</View><View className="summary-value">{latestRelease?.channelLabel.zh ?? "尚未创建"}</View></View>
+            <View className="creator-record-cell"><View className="summary-label">Package</View><View className="summary-value mono">{project.packageId}</View></View>
+            <View className="creator-record-cell"><View className="summary-label">Release</View><View className="summary-value mono">{latestRelease?.releaseId ?? "--"}</View></View>
+            <View className="creator-record-cell"><View className="summary-label">Channel</View><View className="summary-value">{latestRelease?.channelLabel.zh ?? "尚未创建"}</View></View>
           </View>
         </View> : null}
 
