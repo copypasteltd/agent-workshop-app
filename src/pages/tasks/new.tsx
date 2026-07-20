@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button, Image, Input, Switch, Textarea, View } from "@tarojs/components";
 import Taro from "@tarojs/taro";
 import { useEffect, useMemo, useState } from "react";
@@ -11,6 +11,7 @@ import {
   mobileSessionProjectsApi,
 } from "../../lib/api";
 import { resolveMobileEntrySurface } from "../../lib/catalog";
+import { loadMobileCreatorCapabilities } from "../../lib/mobileCreatorCapabilities";
 import {
   buildCreatorRunBindings,
   canCreateMobileSourceRun,
@@ -23,6 +24,32 @@ import {
 } from "../../lib/mobileCreator";
 import { useResolvedMobileWorkspace } from "../../lib/useMobileWorkspace";
 import { hasAuthoritativeMobileWorkspaceContext } from "../../lib/workspaceContext";
+
+type CreatorCapabilities = {
+  providers: Awaited<ReturnType<typeof mobileProvidersApi.listProviders>>;
+  providerBindings: Awaited<ReturnType<typeof mobileProvidersApi.listBindings>>;
+  mcps: Awaited<ReturnType<typeof mobileMcpApi.listMcps>>;
+  mcpBindings: Awaited<ReturnType<typeof mobileMcpApi.listBindings>>;
+  credentials: Awaited<ReturnType<typeof mobileCredentialsApi.listCredentials>>;
+};
+
+type CapabilityLoadState = {
+  status: "idle" | "loading" | "success" | "error";
+  data: CreatorCapabilities;
+  error: Error | null;
+};
+
+const EMPTY_CAPABILITIES: CreatorCapabilities = {
+  providers: [],
+  providerBindings: [],
+  mcps: [],
+  mcpBindings: [],
+  credentials: [],
+};
+
+function toCapabilityError(error: unknown) {
+  return error instanceof Error ? error : new Error("运行能力配置加载失败");
+}
 
 export default function NewTaskPage() {
   const pageShellClass = useMobilePageShellClass("creator-page-shell");
@@ -38,6 +65,12 @@ export default function NewTaskPage() {
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [defaultsApplied, setDefaultsApplied] = useState(false);
   const [createStage, setCreateStage] = useState<"idle" | "project" | "run">("idle");
+  const [capabilityLoadAttempt, setCapabilityLoadAttempt] = useState(0);
+  const [capabilityState, setCapabilityState] = useState<CapabilityLoadState>({
+    status: "idle",
+    data: EMPTY_CAPABILITIES,
+    error: null,
+  });
 
   useEffect(() => {
     const workspaceId = currentWorkspace.runtimeWorkspaceId;
@@ -54,43 +87,64 @@ export default function NewTaskPage() {
     }
   }, [currentWorkspace.runtimeWorkspaceId, draft]);
 
-  const providersQuery = useQuery({
-    queryKey: ["mobile", "creator-launch", "providers", currentWorkspace.selectionId],
-    queryFn: () => mobileProvidersApi.listProviders({ enabled: true }),
-    enabled: workspaceReady && creatorAllowed,
-    retry: false,
-  });
-  const providerBindingsQuery = useQuery({
-    queryKey: ["mobile", "creator-launch", "provider-bindings", currentWorkspace.selectionId],
-    queryFn: () => mobileProvidersApi.listBindings({ enabled: true }),
-    enabled: workspaceReady && creatorAllowed,
-    retry: false,
-  });
-  const mcpsQuery = useQuery({
-    queryKey: ["mobile", "creator-launch", "mcps", currentWorkspace.selectionId],
-    queryFn: () => mobileMcpApi.listMcps({ status: "active" }),
-    enabled: workspaceReady && creatorAllowed,
-    retry: false,
-  });
-  const mcpBindingsQuery = useQuery({
-    queryKey: ["mobile", "creator-launch", "mcp-bindings", currentWorkspace.selectionId],
-    queryFn: () => mobileMcpApi.listBindings({ status: "active" }),
-    enabled: workspaceReady && creatorAllowed,
-    retry: false,
-  });
-  const credentialsQuery = useQuery({
-    queryKey: ["mobile", "creator-launch", "credentials", currentWorkspace.selectionId],
-    queryFn: () => mobileCredentialsApi.listCredentials({ status: "active" }),
-    enabled: workspaceReady && creatorAllowed,
-    retry: false,
-  });
+  useEffect(() => {
+    if (!workspaceReady || !creatorAllowed) {
+      setCapabilityState({ status: "idle", data: EMPTY_CAPABILITIES, error: null });
+      return;
+    }
+
+    let active = true;
+    const workspaceId = currentWorkspace.runtimeWorkspaceId;
+    setCapabilityState({ status: "loading", data: EMPTY_CAPABILITIES, error: null });
+    console.info("[creator-launch] loading capabilities", {
+      workspaceId,
+      attempt: capabilityLoadAttempt + 1,
+    });
+
+    void loadMobileCreatorCapabilities({
+      loadProviders: () => mobileProvidersApi.listProviders({ enabled: true }),
+      loadProviderBindings: () => mobileProvidersApi.listBindings({ enabled: true }),
+      loadMcps: () => mobileMcpApi.listMcps({ status: "active" }),
+      loadMcpBindings: () => mobileMcpApi.listBindings({ status: "active" }),
+      loadCredentials: () => mobileCredentialsApi.listCredentials({ status: "active" }),
+    }).then(({ providers, providerBindings, mcps, mcpBindings, credentials }) => {
+      if (!active) return;
+      const data = { providers, providerBindings, mcps, mcpBindings, credentials };
+      console.info("[creator-launch] capabilities loaded", {
+        workspaceId,
+        providers: providers.length,
+        providerBindings: providerBindings.length,
+        mcps: mcps.length,
+        mcpBindings: mcpBindings.length,
+        credentials: credentials.length,
+      });
+      setCapabilityState({ status: "success", data, error: null });
+    }).catch((error: unknown) => {
+      if (!active) return;
+      const normalizedError = toCapabilityError(error);
+      console.error("[creator-launch] capability loading failed", normalizedError);
+      setCapabilityState({ status: "error", data: EMPTY_CAPABILITIES, error: normalizedError });
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [
+    capabilityLoadAttempt,
+    creatorAllowed,
+    currentWorkspace.runtimeWorkspaceId,
+    workspaceReady,
+  ]);
+
+  const { providers, providerBindings, mcps, mcpBindings, credentials } =
+    capabilityState.data;
 
   const providerOptions = useMemo(() => {
     const providerById = new Map(
-      (providersQuery.data ?? []).map((provider) => [provider.providerId, provider])
+      providers.map((provider) => [provider.providerId, provider])
     );
     return [...new Map(
-      (providerBindingsQuery.data ?? [])
+      providerBindings
         .filter((binding) => binding.enabled)
         .sort((left, right) => {
           if (left.isDefault !== right.isDefault) return left.isDefault ? -1 : 1;
@@ -101,14 +155,14 @@ export default function NewTaskPage() {
           provider: providerById.get(binding.providerId),
         }])
     ).values()].filter((item) => Boolean(item.provider));
-  }, [providerBindingsQuery.data, providersQuery.data]);
+  }, [providerBindings, providers]);
   const selectedProvider =
-    providersQuery.data?.find((provider) => provider.providerId === draft.providerId) ?? null;
+    providers.find((provider) => provider.providerId === draft.providerId) ?? null;
   const enabledModels = selectedProvider?.models.filter((model) => model.enabled) ?? [];
 
   useEffect(() => {
-    if (defaultsApplied || !mcpsQuery.data || !mcpBindingsQuery.data) return;
-    const defaults = resolveAutoAttachedCapabilities(mcpsQuery.data, mcpBindingsQuery.data);
+    if (defaultsApplied || capabilityState.status !== "success") return;
+    const defaults = resolveAutoAttachedCapabilities(mcps, mcpBindings);
     setDraft((current) => ({
       ...current,
       selectedMcpIds: current.selectedMcpIds.length > 0
@@ -119,26 +173,14 @@ export default function NewTaskPage() {
         : defaults.credentialIds,
     }));
     setDefaultsApplied(true);
-  }, [defaultsApplied, mcpBindingsQuery.data, mcpsQuery.data]);
+  }, [capabilityState.status, defaultsApplied, mcpBindings, mcps]);
 
-  const capabilityError =
-    providersQuery.error ?? providerBindingsQuery.error ?? mcpsQuery.error ??
-    mcpBindingsQuery.error ?? credentialsQuery.error;
-  const capabilityLoading =
-    providersQuery.isPending || providerBindingsQuery.isPending || mcpsQuery.isPending ||
-    mcpBindingsQuery.isPending || credentialsQuery.isPending;
-  const capabilityReady =
-    providersQuery.isSuccess && providerBindingsQuery.isSuccess && mcpsQuery.isSuccess &&
-    mcpBindingsQuery.isSuccess && credentialsQuery.isSuccess;
+  const capabilityError = capabilityState.error;
+  const capabilityLoading = capabilityState.status === "loading";
+  const capabilityReady = capabilityState.status === "success";
   const providerReady = providerOptions.length > 0;
   const reloadCapabilities = () => {
-    void Promise.all([
-      providersQuery.refetch(),
-      providerBindingsQuery.refetch(),
-      mcpsQuery.refetch(),
-      mcpBindingsQuery.refetch(),
-      credentialsQuery.refetch(),
-    ]);
+    setCapabilityLoadAttempt((attempt) => attempt + 1);
   };
 
   const createMutation = useMutation({
@@ -163,7 +205,7 @@ export default function NewTaskPage() {
 
       setCreateStage("run");
       const bindings = buildCreatorRunBindings(
-        mcpsQuery.data ?? [],
+        mcps,
         draft.selectedMcpIds,
         draft.selectedCredentialIds
       );
@@ -344,8 +386,8 @@ export default function NewTaskPage() {
             />
           </View>
           <View className="creator-subsection-title">MCP</View>
-          {mcpsQuery.isPending ? <View className="creator-note">正在加载 MCP...</View> : null}
-          {(mcpsQuery.data ?? []).map((entry) => <View className="creator-toggle-row" key={entry.mcpId}>
+          {capabilityLoading ? <View className="creator-note">正在加载 MCP...</View> : null}
+          {mcps.map((entry) => <View className="creator-toggle-row" key={entry.mcpId}>
             <View className="creator-toggle-content"><View className="creator-field-label">{entry.displayName}</View><View className="creator-note">{entry.source} / {entry.transport} / {entry.riskLevel}</View></View>
             <Switch
               checked={draft.selectedMcpIds.includes(entry.mcpId)}
@@ -353,11 +395,11 @@ export default function NewTaskPage() {
               onChange={(event) => toggleMcp(entry.mcpId, event.detail.value)}
             />
           </View>)}
-          {!mcpsQuery.isPending && !mcpsQuery.error && !mcpsQuery.data?.length ? <View className="creator-note">当前工作区没有可用 MCP。</View> : null}
-          {mcpBindingsQuery.isPending ? <View className="creator-note">正在加载默认能力绑定...</View> : null}
+          {capabilityReady && mcps.length === 0 ? <View className="creator-note">当前工作区没有可用 MCP。</View> : null}
+          {capabilityLoading ? <View className="creator-note">正在加载默认能力绑定...</View> : null}
           <View className="creator-subsection-title">Credential 引用</View>
-          {credentialsQuery.isPending ? <View className="creator-note">正在加载 Credential 引用...</View> : null}
-          {(credentialsQuery.data ?? []).map((credential) => <View className="creator-toggle-row" key={credential.credentialId}>
+          {capabilityLoading ? <View className="creator-note">正在加载 Credential 引用...</View> : null}
+          {credentials.map((credential) => <View className="creator-toggle-row" key={credential.credentialId}>
             <View className="creator-toggle-content"><View className="creator-field-label">{credential.displayName}</View><View className="creator-note">{credential.provider} / {credential.mountMode}</View></View>
             <Switch
               checked={draft.selectedCredentialIds.includes(credential.credentialId)}
@@ -365,7 +407,7 @@ export default function NewTaskPage() {
               onChange={(event) => toggleCredential(credential.credentialId, event.detail.value)}
             />
           </View>)}
-          {!credentialsQuery.isPending && !credentialsQuery.error && !credentialsQuery.data?.length ? <View className="creator-note">当前工作区没有可选凭证。</View> : null}
+          {capabilityReady && credentials.length === 0 ? <View className="creator-note">当前工作区没有可选凭证。</View> : null}
           <View className="creator-security-note">仅保存能力和凭证引用，Secret 明文由 Credential Broker 注入实例。</View>
         </View> : null}
       </View>

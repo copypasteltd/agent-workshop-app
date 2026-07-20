@@ -10,12 +10,43 @@ import {
   MOBILE_REQUEST_TIMEOUT_MS,
   resolveMobileNetworkMode,
 } from "../src/lib/mobileNetwork.ts";
+import { loadMobileCreatorCapabilities } from "../src/lib/mobileCreatorCapabilities.ts";
 
 test("WeChat queries bypass the browser online manager and requests have a finite timeout", () => {
   assert.equal(resolveMobileNetworkMode("weapp"), "always");
   assert.equal(resolveMobileNetworkMode("h5"), "online");
   assert.equal(resolveMobileNetworkMode(undefined), "online");
   assert.equal(MOBILE_REQUEST_TIMEOUT_MS, 20_000);
+});
+
+test("creator capability loading directly invokes every required API loader", async () => {
+  const calls: string[] = [];
+  const load = <T>(name: string, value: T) => async () => {
+    calls.push(name);
+    return value;
+  };
+  const result = await loadMobileCreatorCapabilities({
+    loadProviders: load("providers", ["provider"]),
+    loadProviderBindings: load("provider-bindings", ["provider-binding"]),
+    loadMcps: load("mcps", ["mcp"]),
+    loadMcpBindings: load("mcp-bindings", ["mcp-binding"]),
+    loadCredentials: load("credentials", ["credential"]),
+  });
+
+  assert.deepEqual(calls, [
+    "providers",
+    "provider-bindings",
+    "mcps",
+    "mcp-bindings",
+    "credentials",
+  ]);
+  assert.deepEqual(result, {
+    providers: ["provider"],
+    providerBindings: ["provider-binding"],
+    mcps: ["mcp"],
+    mcpBindings: ["mcp-binding"],
+    credentials: ["credential"],
+  });
 });
 
 test("creator project action follows the source, draft, seal, and publication lifecycle", () => {

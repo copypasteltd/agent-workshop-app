@@ -71,6 +71,26 @@ if (hasUnconfiguredApiPlaceholder) {
   throw new Error("Unconfigured API placeholder leaked into the WeChat build");
 }
 
+const creatorLaunchPageSource = readFileSync(
+  path.join(distRoot, "pages", "tasks", "new.js"),
+  "utf8"
+);
+const requiredCreatorCapabilityMarkers = [
+  "[creator-launch] loading capabilities",
+  "[creator-launch] capabilities loaded",
+  "listProviders",
+  "listMcps",
+  "listCredentials",
+];
+for (const marker of requiredCreatorCapabilityMarkers) {
+  if (!creatorLaunchPageSource.includes(marker)) {
+    throw new Error(`Missing direct Creator capability loader marker: ${marker}`);
+  }
+}
+if (creatorLaunchPageSource.includes(".useQuery(")) {
+  throw new Error("Creator launch capability loading must not depend on useQuery scheduling");
+}
+
 const sourceProject = JSON.parse(
   readFileSync(path.join(projectRoot, "project.config.json"), "utf8")
 );

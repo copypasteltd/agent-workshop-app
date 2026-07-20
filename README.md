@@ -161,4 +161,4 @@ The Creator pages now apply explicit cross-platform component classes, stable fo
 
 新建实例页现在区分加载中、加载失败和未配置状态。请求失败后显示“重新加载”，MCP 与 Credential 在查询完成前不会提前显示空态。全部账户级运行能力加载成功后，页面启用“启动空白 Codex”。
 
-The WeChat runtime always dispatches React Query operations through `Taro.request`, applies a finite request timeout, and exposes explicit retry feedback for capability-loading failures.
+The WeChat runtime always dispatches shared React Query operations through `Taro.request` and applies a finite request timeout. The new-instance page additionally invokes all five capability APIs through its own lifecycle state machine, removing first-load dependence on React Query observer scheduling.
