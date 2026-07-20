@@ -3,7 +3,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button, Image, Input, View } from "@tarojs/components";
 import Taro from "@tarojs/taro";
 import { useMemo, useState } from "react";
-import logoMark from "../../assets/logo-ui.png";
 import {
   mobileAuthApi,
   mobileBillingApi,
@@ -11,6 +10,8 @@ import {
   mobileNotificationsApi,
   mobileQuotaApi,
 } from "../../lib/api";
+import { mobileLogoSource } from "../../lib/mobileAssets";
+import { useMobilePageShellClass } from "../../components/MobilePageShell";
 import {
   billingCostBasisLabel,
   billingSourceLabel,
@@ -186,6 +187,7 @@ function buildMobileFavoriteRoute(target: {
 }
 
 export default function MePage() {
+  const pageShellClass = useMobilePageShellClass();
   const queryClient = useQueryClient();
   const theme = useMobileUiStore((state) => state.theme);
   const workspaceSheetOpen = useMobileUiStore((state) => state.workspaceSheetOpen);
@@ -1009,13 +1011,18 @@ export default function MePage() {
     (taskDataMode === "empty" ? 0 : metrics.tasks);
 
   return (
-    <View className="page-shell">
+    <View className={pageShellClass}>
       <View className="page" data-page="profile" data-testid="mobile-me-page">
         <View className="hero-card profile-hero">
           <View className="card-row">
             <View className="brand-row">
               <View className="brand-mark">
-                <Image src={logoMark} mode="aspectFit" />
+                <Image
+                  className="brand-logo-image"
+                  src={mobileLogoSource}
+                  mode="aspectFit"
+                  style={{ width: "100%", height: "100%" }}
+                />
               </View>
               <View>
                 <View className="section-title">
@@ -1036,8 +1043,8 @@ export default function MePage() {
                     ? "匿名模式"
                     : "待登录"}
               </View>
-              <Button className="pill" onClick={toggleTheme}>
-                {theme === "dark" ? "深色" : "浅色"}
+              <Button className="pill" data-testid="mobile-theme-toggle" onClick={toggleTheme}>
+                {theme === "dark" ? "切换浅色" : "切换深色"}
               </Button>
               {authMode === "required" ? (
                 <Button
@@ -1069,6 +1076,36 @@ export default function MePage() {
             <View className="mini-card">
               <View className="page-eyebrow">待处理</View>
               <View className="mini-value">{profileStats.pending}</View>
+            </View>
+          </View>
+        </View>
+
+        <View className="page-section">
+          <View className="section-head">
+            <View>
+              <View className="page-eyebrow">Creator</View>
+              <View className="section-title">我的创作</View>
+              <View className="section-copy">
+                查看空白实例、固化草稿、密封版本与发布状态。
+              </View>
+            </View>
+            <Button
+              className="pill active"
+              data-testid="mobile-creator-projects-entry"
+              onClick={() => Taro.navigateTo({ url: "/pages/creator/projects" })}
+            >
+              进入
+            </Button>
+          </View>
+          <View className="profile-card creator-profile-entry">
+            <View className="card-row">
+              <View>
+                <View className="file-name">Session 工作流项目</View>
+                <View className="file-meta">从 Source Run 到工坊服务的完整版本链路</View>
+              </View>
+              <Button className="pill" onClick={() => Taro.navigateTo({ url: "/pages/tasks/new" })}>
+                新建
+              </Button>
             </View>
           </View>
         </View>

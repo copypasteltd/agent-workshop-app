@@ -1,3 +1,4 @@
+import "whatwg-fetch";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import Taro, { useLaunch } from "@tarojs/taro";
 import type { PropsWithChildren } from "react";
@@ -9,6 +10,7 @@ import { useMobileAuthStore } from "./stores/mobileAuthStore";
 import { useMobileUiStore } from "./stores/mobileUiStore";
 import "./app.css";
 import "./styles/task-detail.css";
+import "./styles/creator.css";
 
 function App({ children }: PropsWithChildren) {
   const theme = useMobileUiStore((state) => state.theme);
@@ -43,6 +45,23 @@ function App({ children }: PropsWithChildren) {
         : `${currentWorkspace.name} / 灵办词元`;
     document.body.dataset.theme = theme;
     applyMobileTheme(theme);
+
+    const pages = Taro.getCurrentPages();
+    const currentRoute = pages[pages.length - 1]?.route ?? "";
+    const isTabBarPage = [
+      "pages/workshops/index",
+      "pages/tasks/index",
+      "pages/me/index",
+    ].includes(currentRoute);
+
+    if (
+      !isTabBarPage ||
+      authMode === "unknown" ||
+      (authMode === "required" && !authenticated)
+    ) {
+      return;
+    }
+
     void Taro.setTabBarStyle(
       theme === "light"
         ? {

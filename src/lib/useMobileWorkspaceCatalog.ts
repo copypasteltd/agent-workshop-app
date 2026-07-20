@@ -54,6 +54,7 @@ export function useMobileWorkspaceCatalog(
     queryFn: async () =>
       mobileCatalogApi.listWorkshops({
         workspaceContextKey: currentWorkspace.id,
+        workspaceId: currentWorkspace.runtimeWorkspaceId,
         entrySurface,
       }),
     enabled: workspaceDataReady,
@@ -74,6 +75,7 @@ export function useMobileWorkspaceCatalog(
     queryFn: async () =>
       mobileCatalogApi.listServices({
         workspaceContextKey: currentWorkspace.id,
+        workspaceId: currentWorkspace.runtimeWorkspaceId,
         entrySurface,
       }),
     enabled: workspaceDataReady,

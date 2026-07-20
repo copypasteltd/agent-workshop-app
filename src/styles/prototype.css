@@ -1,9 +1,9 @@
 ﻿:root {
       --font-body: "Segoe UI", "PingFang SC", "Noto Sans SC", sans-serif;
       --font-mono: "Consolas", "JetBrains Mono", monospace;
-      --radius-phone: 28px;
-      --radius-card: 18px;
-      --radius-soft: 12px;
+      --radius-phone: 20px;
+      --radius-card: 8px;
+      --radius-soft: 6px;
       --radius-pill: 999px;
     }
     body[data-theme="dark"] {
@@ -47,6 +47,55 @@
       --hero: linear-gradient(180deg, rgba(83,102,235,0.1), rgba(83,102,235,0.02));
       --shadow-soft: 0 24px 70px rgba(26, 34, 48, 0.12);
       --shadow-card: 0 10px 24px rgba(26, 34, 48, 0.08);
+    }
+    page,
+    .theme-dark {
+      --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Noto Sans SC", sans-serif;
+      --font-mono: "SFMono-Regular", "Cascadia Code", "Consolas", monospace;
+      --radius-phone: 20px;
+      --radius-card: 8px;
+      --radius-soft: 6px;
+      --radius-pill: 999px;
+      --bg: #090b0d;
+      --bg-2: #12161b;
+      --phone: #0e1217;
+      --surface: #12161c;
+      --surface-2: #0f141b;
+      --surface-3: #151b24;
+      --line: #272d36;
+      --line-strong: #394350;
+      --text: #edf1f7;
+      --muted: #8993a1;
+      --accent: #7281ff;
+      --accent-soft: rgba(114,129,255,0.12);
+      --success: #79d99b;
+      --success-soft: rgba(121,217,155,0.1);
+      --warn: #d9a441;
+      --warn-soft: rgba(217,164,65,0.12);
+      --hero: linear-gradient(180deg, rgba(114,129,255,0.12), rgba(114,129,255,0.02));
+      --shadow-soft: 0 28px 80px rgba(0, 0, 0, 0.42);
+      --shadow-card: 0 12px 28px rgba(0, 0, 0, 0.18);
+    }
+    .theme-light {
+      --bg: #edf0f5;
+      --bg-2: #dbe2ea;
+      --phone: #f4f7fb;
+      --surface: #ffffff;
+      --surface-2: #edf2f8;
+      --surface-3: #e4ebf5;
+      --line: #c8d1de;
+      --line-strong: #a8b6c7;
+      --text: #18202b;
+      --muted: #657283;
+      --accent: #5366eb;
+      --accent-soft: rgba(83,102,235,0.1);
+      --success: #408d5d;
+      --success-soft: rgba(64,141,93,0.1);
+      --warn: #a8731d;
+      --warn-soft: rgba(168,115,29,0.12);
+      --hero: linear-gradient(180deg, rgba(83,102,235,0.1), rgba(83,102,235,0.02));
+      --shadow-soft: 0 24px 70px rgba(26, 34, 48, 0.12);
+      --shadow-card: 0 8px 20px rgba(26, 34, 48, 0.07);
     }
     * { box-sizing: border-box; }
     body {

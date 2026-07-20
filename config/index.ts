@@ -36,7 +36,9 @@ export default defineConfig<"vite">(async (merge) => {
   // packages in production builds to reduce cross-package compile pressure.
   const useSourceAliases =
     process.env.NODE_ENV === "development" || process.env.LINGBAN_USE_SOURCE_ALIASES === "1";
-  const designWidth = process.env.TARO_ENV === "h5" ? 375 : 750;
+  // Every mobile surface is authored against a 375px viewport. A 750 design
+  // width halves the physical size of the WeChat typography and controls.
+  const designWidth = 375;
   const baseConfig: UserConfigExport<"vite"> = {
     projectName: "lingban-mobile",
     date: "2026-7-7",
@@ -49,8 +51,18 @@ export default defineConfig<"vite">(async (merge) => {
     },
     sourceRoot: "src",
     outputRoot: "dist",
-    plugins: ["@tarojs/plugin-generator"],
+    plugins: [
+      "@tarojs/plugin-generator",
+      [
+        "@tarojs/plugin-http",
+        {
+          enableCookie: false,
+        },
+      ],
+    ],
     defineConstants: {
+      // plugin-http injects this through Webpack only; Vite needs an explicit define.
+      ENABLE_COOKIE: "false",
       "process.env.TARO_APP_API_BASE_URL": JSON.stringify(
         process.env.TARO_APP_API_BASE_URL ?? ""
       ),
@@ -59,7 +71,12 @@ export default defineConfig<"vite">(async (merge) => {
       ),
     },
     copy: {
-      patterns: [],
+      patterns: [
+        {
+          from: "src/assets/logo-ui.png",
+          to: "dist/assets/logo-ui.png",
+        },
+      ],
       options: {},
     },
     framework: "react",

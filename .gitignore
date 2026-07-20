@@ -19,3 +19,4 @@ yarn-debug.log*
 !.env.test
 .idea/
 .vscode/
+project.private.config.json

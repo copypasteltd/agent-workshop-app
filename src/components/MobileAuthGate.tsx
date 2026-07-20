@@ -4,12 +4,15 @@ import type {
   AuthSessionEnvelope,
 } from "@lingban/contracts";
 import { useEffect } from "react";
-import { View } from "@tarojs/components";
-import { mobileApiBaseUrl, mobileAuthFetch } from "../lib/api";
+import Taro from "@tarojs/taro";
+import {
+  mobileApiBaseUrl,
+  mobileApiConfigured,
+  mobileAuthFetch,
+} from "../lib/api";
 import { inferMobileWorkspaceContextKey } from "../lib/workspaceContext";
 import { useMobileAuthStore } from "../stores/mobileAuthStore";
 import { useMobileUiStore } from "../stores/mobileUiStore";
-import { MobileAuthScreen } from "./MobileAuthScreen";
 
 const mobileE2eAuthMode = process.env.TARO_APP_E2E_AUTH_MODE?.trim();
 
@@ -117,6 +120,12 @@ export function MobileAuthGate({ children }: PropsWithChildren) {
         return;
       }
 
+      if (process.env.TARO_ENV === "weapp" && !mobileApiConfigured) {
+        authStore.setAuthMode("required");
+        authStore.clearAuth("小程序服务地址尚未配置");
+        return;
+      }
+
       try {
         const response = await mobileAuthFetch(`${mobileApiBaseUrl}/v1/auth/session`);
 
@@ -166,27 +175,29 @@ export function MobileAuthGate({ children }: PropsWithChildren) {
     };
   }, []);
 
-  return (
-    <>
-      {children}
-      {bootstrapping || authMode === "unknown" ? (
-        <View className="auth-screen-overlay">
-          <View className="page-shell auth-screen-shell">
-            <View className="page auth-screen-page active">
-              <View className="hero-card auth-screen-card">
-                <View className="page-eyebrow">灵办词元 / 会话恢复</View>
-                <View className="section-title">正在恢复当前工作区</View>
-                <View className="section-copy">
-                  正在检查令牌状态、当前空间和可见工坊。恢复完成后会继续回到你上次的移动端工作现场。
-                </View>
-              </View>
-            </View>
-          </View>
-        </View>
-      ) : null}
-      {authMode !== "disabled" && !authenticated && !bootstrapping ? (
-        <MobileAuthScreen />
-      ) : null}
-    </>
-  );
+  useEffect(() => {
+    if (bootstrapping || authMode === "unknown") {
+      return;
+    }
+
+    const pages = Taro.getCurrentPages();
+    const currentRoute = pages[pages.length - 1]?.route ?? "";
+    const authRoute = "pages/auth/index";
+
+    if (authMode === "required" && !authenticated && currentRoute !== authRoute) {
+      void Taro.reLaunch({ url: `/${authRoute}` });
+      return;
+    }
+
+    if (
+      (authMode === "disabled" || authenticated) &&
+      currentRoute === authRoute
+    ) {
+      void Taro.switchTab({ url: "/pages/workshops/index" }).then(() =>
+        Taro.showTabBar({ animation: false })
+      );
+    }
+  }, [authMode, authenticated, bootstrapping]);
+
+  return <>{children}</>;
 }

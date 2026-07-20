@@ -14,6 +14,7 @@ import {
 import { useMobileRecentRecorder } from "../../lib/recent";
 import { useResolvedMobileWorkspace } from "../../lib/useMobileWorkspace";
 import { hasAuthoritativeMobileWorkspaceContext } from "../../lib/workspaceContext";
+import { useMobilePageShellClass } from "../../components/MobilePageShell";
 
 function resolveMissingCredentialIds(error: unknown) {
   if (!(error instanceof ApiError) || error.code !== "CREDENTIAL_REQUIREMENT_UNMET") {
@@ -43,6 +44,7 @@ type LaunchProviderOption = {
 };
 
 export default function ServiceDetailPage() {
+  const pageShellClass = useMobilePageShellClass();
   const queryClient = useQueryClient();
   const id = getCurrentInstance().router?.params?.id;
   const currentWorkspace = useResolvedMobileWorkspace();
@@ -67,6 +69,7 @@ export default function ServiceDetailPage() {
 
       return mobileCatalogApi.getService(id, {
         workspaceContextKey: currentWorkspace.id,
+        workspaceId: currentWorkspace.runtimeWorkspaceId,
         entrySurface,
       });
     },
@@ -238,7 +241,7 @@ export default function ServiceDetailPage() {
 
   if (!workspaceDataReady) {
     return (
-      <View className="page-shell">
+      <View className={pageShellClass}>
         <View className="page-section">
           <View className="hero-card">
             <View className="section-title">Waiting for workspace context</View>
@@ -257,7 +260,7 @@ export default function ServiceDetailPage() {
 
   if (!service) {
     return (
-      <View className="page-shell">
+      <View className={pageShellClass}>
         <View className="page-section">
           <View className="hero-card">
             <View className="section-title">当前工作区暂无可启动服务</View>
@@ -274,7 +277,7 @@ export default function ServiceDetailPage() {
   }
 
   return (
-    <View className="page-shell">
+    <View className={pageShellClass}>
       <View className="page-section">
         <View className="hero-card">
           <View className="section-head">

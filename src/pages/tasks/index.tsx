@@ -6,8 +6,10 @@ import { mobileRunsApi } from "../../lib/api";
 import { mapRunSnapshotToMobileTask } from "../../lib/liveTaskAdapters";
 import { useMobileWorkspaceCatalog } from "../../lib/useMobileWorkspaceCatalog";
 import { useResolvedMobileWorkspace } from "../../lib/useMobileWorkspace";
+import { useMobilePageShellClass } from "../../components/MobilePageShell";
 
 export default function TasksPage() {
+  const pageShellClass = useMobilePageShellClass();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "running" | "approval" | "done">("all");
   const [tagFilter, setTagFilter] = useState("all");
@@ -91,8 +93,22 @@ export default function TasksPage() {
       : `${currentWorkspace.name} 当前没有持续运行的实例`;
 
   return (
-    <View className="page-shell">
+    <View className={pageShellClass}>
       <View className="page" data-page="tasks" data-testid="mobile-tasks-page">
+        <View className="section-head mobile-page-command-head">
+          <View>
+            <View className="page-eyebrow">实例中心</View>
+            <View className="section-title">任务与对话</View>
+            <View className="section-copy">管理运行实例，或从空白 Codex 开始创作工作流。</View>
+          </View>
+          <Button
+            className="pill active"
+            data-testid="mobile-new-instance-entry"
+            onClick={() => Taro.navigateTo({ url: "/pages/tasks/new" })}
+          >
+            新建实例
+          </Button>
+        </View>
         <View className="search-bar">
           <Input
             className="search-input"
@@ -169,9 +185,17 @@ export default function TasksPage() {
                 {taskDataMode === "waiting"
                   ? "工作区会话恢复后，任务中心将从正式后端链路加载实时实例。"
                   : taskDataMode === "empty"
-                  ? "请返回工坊启动新的 Agent 实例并开始完整对话。"
+                  ? "创建一个空白 Codex，在完整对话中完成工作流后即可固化和发布。"
                   : "请清空搜索条件，或切换状态和标签筛选。"}
               </View>
+              {taskDataMode === "empty" ? (
+                <Button
+                  className="send-btn"
+                  onClick={() => Taro.navigateTo({ url: "/pages/tasks/new" })}
+                >
+                  新建空白实例
+                </Button>
+              ) : null}
             </View>
           ) : null}
 

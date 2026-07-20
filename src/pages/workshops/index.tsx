@@ -4,11 +4,12 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button, Image, Input, View } from "@tarojs/components";
 import Taro from "@tarojs/taro";
 import { useDeferredValue, useMemo, useState } from "react";
-import logoMark from "../../assets/logo-ui.png";
 import workshopDrama from "../../assets/workshop-drama.svg";
 import workshopImage from "../../assets/workshop-image.svg";
 import workshopTax from "../../assets/workshop-tax.svg";
 import { mobileMeApi, mobileSearchApi } from "../../lib/api";
+import { mobileLogoSource } from "../../lib/mobileAssets";
+import { useMobilePageShellClass } from "../../components/MobilePageShell";
 import { useResolvedMobileWorkspace } from "../../lib/useMobileWorkspace";
 import { useMobileWorkspaceCatalog } from "../../lib/useMobileWorkspaceCatalog";
 
@@ -66,6 +67,7 @@ function buildMobileSearchTypeLabel(resourceType: SearchResultRecord["resourceTy
 }
 
 export default function WorkshopsPage() {
+  const pageShellClass = useMobilePageShellClass();
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState("");
   const [surfaceFilter, setSurfaceFilter] = useState<WorkshopSurfaceFilter>("all");
@@ -286,7 +288,7 @@ export default function WorkshopsPage() {
   const showServices = surfaceFilter === "all" || surfaceFilter === "services";
   const showTasks = surfaceFilter === "all" || surfaceFilter === "tasks";
   const toolbarSummary = !workspaceDataReady
-    ? "Waiting for the current workspace context before loading the workshop catalog."
+    ? "登录完成后将同步当前工作区的工坊、服务和最近任务。"
     : remoteSearchExperience
     ? searchResultsQuery.isLoading && !searchResultsQuery.data
       ? "正在查询当前工作区内的工坊、服务与任务。"
@@ -300,20 +302,30 @@ export default function WorkshopsPage() {
       : `当前工作区：${currentWorkspace.name} / 默认目录 ${currentWorkspace.root} / 命中 ${filteredWorkshops.length} 个工坊，${filteredServices.length} 个服务，${filteredRecentTasks.length} 个任务`;
 
   return (
-    <View className="page-shell">
+    <View className={pageShellClass}>
       <View className="page" data-page="workshops" data-testid="mobile-workshops-page">
         <View className="hero-card">
           <View className="section-head">
             <View className="brand-row">
               <View className="brand-mark">
-                <Image src={logoMark} mode="aspectFit" />
+                <Image
+                  className="brand-logo-image"
+                  src={mobileLogoSource}
+                  mode="aspectFit"
+                  style={{ width: "100%", height: "100%" }}
+                />
               </View>
               <View>
                 <View className="page-eyebrow">灵办词元 / 当前空间</View>
                 <View className="section-title">{currentWorkspace.name}</View>
+                <View className="profile-note">
+                  {workspaceDataReady ? currentWorkspace.meta : "等待账户工作区同步"}
+                </View>
               </View>
             </View>
-            <View className="pill success">{currentWorkspace.meta}</View>
+            <View className={`pill ${workspaceDataReady ? "success" : "warn"}`}>
+              {workspaceDataReady ? "已连接" : "待连接"}
+            </View>
           </View>
           <View className="profile-grid">
             <View className="mini-card">
@@ -364,9 +376,15 @@ export default function WorkshopsPage() {
             ))}
             <View className="task-chip">{currentWorkspace.type}</View>
           </View>
-          <View className="card-row">
-            <View className="muted">{toolbarSummary}</View>
-            <View className="pill-row">
+          <View className="workshop-toolbar-summary">{toolbarSummary}</View>
+          <View className="workshop-toolbar-actions">
+              <Button
+                className="pill active"
+                data-testid="mobile-workshops-create-source"
+                onClick={() => Taro.navigateTo({ url: "/pages/tasks/new" })}
+              >
+                创建工作流
+              </Button>
               <Button
                 className="pill"
                 data-testid="mobile-workshops-to-me"
@@ -374,18 +392,16 @@ export default function WorkshopsPage() {
               >
                 去我的
               </Button>
-              <View className="pill">实例启动后由 Codex 继续追问信息</View>
-            </View>
+              <View className="workshop-guidance">可从现有服务启动，也可创建空白 Codex 并固化为新服务</View>
           </View>
         </View>
 
         {!workspaceDataReady ? (
           <View className="page-section">
             <View className="empty-state">
-              <View className="section-title">Waiting for workspace context</View>
+              <View className="section-title">正在连接工作区</View>
               <View className="empty-copy">
-                The workshop shelf stays paused until the app restores an authoritative workspace
-                context from the backend session.
+                账户验证完成后，这里会展示你有权访问的工坊和服务。
               </View>
             </View>
           </View>

@@ -16,6 +16,7 @@ import {
 import { useMobileRecentRecorder } from "../../lib/recent";
 import { useResolvedMobileWorkspace } from "../../lib/useMobileWorkspace";
 import { hasAuthoritativeMobileWorkspaceContext } from "../../lib/workspaceContext";
+import { useMobilePageShellClass } from "../../components/MobilePageShell";
 
 const workshopCoverMap: Record<string, string> = {
   "enterprise-tax": workshopTax,
@@ -24,6 +25,7 @@ const workshopCoverMap: Record<string, string> = {
 };
 
 export default function WorkshopDetailPage() {
+  const pageShellClass = useMobilePageShellClass();
   const id = getCurrentInstance().router?.params?.id;
   const [searchQuery, setSearchQuery] = useState("");
   const currentWorkspace = useResolvedMobileWorkspace();
@@ -46,6 +48,7 @@ export default function WorkshopDetailPage() {
 
       return mobileCatalogApi.getWorkshop(id, {
         workspaceContextKey: currentWorkspace.id,
+        workspaceId: currentWorkspace.runtimeWorkspaceId,
         entrySurface,
       });
     },
@@ -91,7 +94,7 @@ export default function WorkshopDetailPage() {
 
   if (!workspaceDataReady) {
     return (
-      <View className="page-shell">
+      <View className={pageShellClass}>
         <View className="hero-card">
           <View className="section-title">Waiting for workspace context</View>
           <View className="section-copy">
@@ -108,7 +111,7 @@ export default function WorkshopDetailPage() {
 
   if (!workshop) {
     return (
-      <View className="page-shell">
+      <View className={pageShellClass}>
         <View className="hero-card">
           <View className="section-title">当前工作区暂无可见工坊</View>
           <View className="section-copy">
@@ -123,7 +126,7 @@ export default function WorkshopDetailPage() {
   }
 
   return (
-    <View className="page-shell">
+    <View className={pageShellClass}>
       <View className="crumb-row">
         <Button className="crumb-btn" onClick={() => Taro.navigateBack()}>
           返回工坊

@@ -49,7 +49,7 @@ button::after {
   --task-panel: color-mix(in srgb, var(--surface) 94%, var(--bg));
   --task-panel-raised: color-mix(in srgb, var(--surface-2) 88%, var(--surface));
   --task-divider: color-mix(in srgb, var(--line) 82%, transparent);
-  padding: 14px 14px calc(96px + env(safe-area-inset-bottom));
+  padding: 14px 14px calc(244px + env(safe-area-inset-bottom));
   gap: 10px;
 }
 
@@ -362,9 +362,11 @@ body[data-theme="light"] .task-detail-page .capture-sheet-icon {
 }
 
 .task-detail-page .task-composer {
-  position: sticky;
+  position: fixed;
+  left: 50%;
   bottom: max(8px, env(safe-area-inset-bottom));
   z-index: 30;
+  width: min(calc(100vw - 28px), 452px);
   padding: 10px;
   gap: 8px;
   border: 1px solid var(--line-strong);
@@ -372,6 +374,7 @@ body[data-theme="light"] .task-detail-page .capture-sheet-icon {
   background: color-mix(in srgb, var(--surface) 96%, transparent);
   box-shadow: 0 14px 34px rgba(0, 0, 0, 0.32);
   backdrop-filter: blur(16px);
+  transform: translateX(-50%);
 }
 
 .task-composer-head {
@@ -417,7 +420,7 @@ body[data-theme="light"] .task-detail-page .capture-sheet-icon {
 
 .task-detail-page .task-composer-input {
   width: 100%;
-  min-height: 72px;
+  min-height: 54px;
   padding: 10px 12px;
   border: 1px solid var(--task-divider);
   border-radius: 6px;
@@ -431,7 +434,7 @@ body[data-theme="light"] .task-detail-page .capture-sheet-icon {
 .task-detail-page .task-composer-input .taro-textarea {
   width: 100%;
   height: 100%;
-  min-height: 50px;
+  min-height: 32px;
   color: var(--text) !important;
   background: transparent !important;
   font-family: var(--font-body);
@@ -526,7 +529,7 @@ body[data-theme="light"] .task-detail-page .capture-sheet-icon {
   line-height: 1;
 }
 
-.task-detail-page .composer-send-button[disabled] {
+.task-detail-page .composer-send-button[disabled]:not([disabled="false"]) {
   border-color: var(--task-divider);
   color: var(--muted);
   background: var(--surface-3);

@@ -4,11 +4,17 @@ const tabbarAssetRoot =
 export default defineAppConfig({
   pages: [
     "pages/workshops/index",
+    "pages/auth/index",
     "pages/workshops/detail",
     "pages/services/detail",
     "pages/tasks/index",
+    "pages/tasks/new",
     "pages/tasks/detail",
     "pages/tasks/files",
+    "pages/creator/projects",
+    "pages/creator/project",
+    "pages/creator/draft",
+    "pages/creator/publish",
     "pages/me/index",
   ],
   window: {

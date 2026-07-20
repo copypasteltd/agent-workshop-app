@@ -2,6 +2,7 @@ import {
   createAuthApiClient,
   createBillingApiClient,
   createCredentialsApiClient,
+  createCreatorApiClient,
   createMeApiClient,
   createNotificationsApiClient,
   createQuotaApiClient,
@@ -9,6 +10,10 @@ import {
   createMcpGovernanceApiClient,
   createRunsApiClient,
   createSessionCapturesApiClient,
+  createSessionDraftsApiClient,
+  createSessionProjectsApiClient,
+  createSessionVersionsApiClient,
+  createSessionsApiClient,
   createSearchApiClient,
   createSessionRefreshFetch,
   createWorkshopCatalogApiClient,
@@ -24,12 +29,15 @@ import {
   type WorkspaceProviderBinding,
 } from "@lingban/contracts";
 import { useMobileAuthStore } from "../stores/mobileAuthStore";
+import { taroRequestFetch } from "./taroRequestFetch";
 
 type MobileRuntimeWindow = Window & {
   __LINGBAN_RUNTIME_CONFIG__?: {
     apiBaseUrl?: string;
   };
 };
+
+export const defaultWeappApiBaseUrl = "https://codex-miniapp.sidcloud.cn";
 
 function normalizeApiBaseUrl(value?: string | null) {
   const trimmed = value?.trim();
@@ -70,10 +78,16 @@ function resolveMobileApiBaseUrl() {
     return `${protocol}//${host}`;
   }
 
+  if (process.env.TARO_ENV === "weapp") {
+    return defaultWeappApiBaseUrl;
+  }
+
   return "http://127.0.0.1:3100";
 }
 
-export const mobileApiBaseUrl = resolveMobileApiBaseUrl();
+const resolvedMobileApiBaseUrl = resolveMobileApiBaseUrl();
+export const mobileApiConfigured = resolvedMobileApiBaseUrl.length > 0;
+export const mobileApiBaseUrl = resolvedMobileApiBaseUrl;
 
 function getMobileAccessToken() {
   return useMobileAuthStore.getState().tokens?.accessToken;
@@ -85,6 +99,7 @@ function getMobileRefreshToken() {
 
 export const mobileAuthFetch = createSessionRefreshFetch({
   baseUrl: mobileApiBaseUrl,
+  fetcher: process.env.TARO_ENV === "weapp" ? taroRequestFetch : undefined,
   getAccessToken: getMobileAccessToken,
   getRefreshToken: getMobileRefreshToken,
   applySessionResponse(response) {
@@ -110,6 +125,36 @@ export const mobileRunsApi = createRunsApiClient({
 });
 
 export const mobileSessionCapturesApi = createSessionCapturesApiClient({
+  baseUrl: mobileApiBaseUrl,
+  fetcher: mobileAuthFetch,
+  getAccessToken: getMobileAccessToken,
+});
+
+export const mobileSessionDraftsApi = createSessionDraftsApiClient({
+  baseUrl: mobileApiBaseUrl,
+  fetcher: mobileAuthFetch,
+  getAccessToken: getMobileAccessToken,
+});
+
+export const mobileSessionVersionsApi = createSessionVersionsApiClient({
+  baseUrl: mobileApiBaseUrl,
+  fetcher: mobileAuthFetch,
+  getAccessToken: getMobileAccessToken,
+});
+
+export const mobileSessionsApi = createSessionsApiClient({
+  baseUrl: mobileApiBaseUrl,
+  fetcher: mobileAuthFetch,
+  getAccessToken: getMobileAccessToken,
+});
+
+export const mobileSessionProjectsApi = createSessionProjectsApiClient({
+  baseUrl: mobileApiBaseUrl,
+  fetcher: mobileAuthFetch,
+  getAccessToken: getMobileAccessToken,
+});
+
+export const mobileCreatorApi = createCreatorApiClient({
   baseUrl: mobileApiBaseUrl,
   fetcher: mobileAuthFetch,
   getAccessToken: getMobileAccessToken,

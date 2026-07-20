@@ -38,6 +38,7 @@ import { mobileRunDetailQueryKey, mobileRunFilesQueryKey } from "../../lib/runQu
 import { useMobileRecentRecorder } from "../../lib/recent";
 import { useMobileRunStream } from "../../lib/runStream";
 import { useResolvedMobileWorkspace } from "../../lib/useMobileWorkspace";
+import { useMobilePageShellClass } from "../../components/MobilePageShell";
 import {
   useMobileUiStore,
   type MobileOutgoingMessageRecord,
@@ -371,16 +372,6 @@ function formatCaptureBytes(value: number) {
   return `${value} B`;
 }
 
-function openCreatorDashboard() {
-  if (typeof window === "undefined") return;
-  const url = new URL(window.location.href);
-  if (url.port === "38120") url.port = "38110";
-  url.pathname = "/workspace/creator";
-  url.search = "";
-  url.hash = "";
-  window.location.assign(url.toString());
-}
-
 function attachmentsEqual(
   left: RunConversationAttachment[] | Array<{ label: string; path: string }>,
   right: Array<{ label: string; path: string }>
@@ -437,6 +428,7 @@ function mapOutgoingMessageToDisplay(
 }
 
 export default function TaskDetailPage() {
+  const pageShellClass = useMobilePageShellClass("task-detail-page");
   const queryClient = useQueryClient();
   const id = getCurrentInstance().router?.params?.id;
   const liveTaskId = isLiveTaskId(id);
@@ -712,7 +704,7 @@ export default function TaskDetailPage() {
     mappedLiveTask,
   ]);
 
-  const [summaryOpen, setSummaryOpen] = useState(true);
+  const [summaryOpen, setSummaryOpen] = useState(false);
   const [reviewError, setReviewError] = useState("");
   const [reviewFormsByAnswerId, setReviewFormsByAnswerId] = useState<
     Record<string, ReviewFormState>
@@ -729,6 +721,7 @@ export default function TaskDetailPage() {
   const activeCapture =
     capturesQuery.data?.find((capture) => capture.captureId === submittedCaptureId) ??
     capturesQuery.data?.find((capture) => !["CAPTURED", "FAILED", "CANCELLED"].includes(capture.status)) ??
+    capturesQuery.data?.[0] ??
     null;
   const captureReady =
     liveSnapshot?.agentThread?.currentTurnState === "completed" &&
@@ -758,7 +751,7 @@ export default function TaskDetailPage() {
         },
         destinationSessionId: null,
         createDraft: true,
-        idempotencyKey: `h5:${task.id}:${Date.now()}`,
+        idempotencyKey: `mobile:${task.id}:${liveSnapshot.agentThread?.currentTurnId ?? "terminal"}`,
       });
     },
     onSuccess: async (result) => {
@@ -766,6 +759,7 @@ export default function TaskDetailPage() {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["mobile", "session-captures", id] }),
         queryClient.invalidateQueries({ queryKey: id ? mobileRunDetailQueryKey(id) : ["mobile", "runs"] }),
+        queryClient.invalidateQueries({ queryKey: ["mobile", "creator"] }),
       ]);
     },
     onError: (error) => {
@@ -1252,7 +1246,7 @@ export default function TaskDetailPage() {
 
   if (!task && routeTaskOutOfScope) {
     return (
-      <View className="page-shell">
+      <View className={pageShellClass}>
         <View className="hero-card">
           <View className="section-title">当前任务不属于这个工作区</View>
           <View className="section-copy">
@@ -1273,7 +1267,7 @@ export default function TaskDetailPage() {
 
   if (!task && liveTaskId && liveTaskQuery.isPending) {
     return (
-      <View className="page-shell">
+      <View className={pageShellClass}>
         <View className="hero-card">
           <View className="section-title">正在加载实例对话</View>
           <View className="section-copy">正在同步当前 run 的消息、状态和文件摘要。</View>
@@ -1284,7 +1278,7 @@ export default function TaskDetailPage() {
 
   if (!task) {
     return (
-      <View className="page-shell">
+      <View className={pageShellClass}>
         <View className="hero-card">
           <View className="section-title">当前工作区暂无可查看任务</View>
           <View className="section-copy">先回到工坊启动一个实例，或者切换到有任务的工作区。</View>
@@ -1297,7 +1291,7 @@ export default function TaskDetailPage() {
   }
 
   return (
-    <View className="page-shell task-detail-page" data-testid="mobile-task-detail-page">
+    <View className={pageShellClass} data-testid="mobile-task-detail-page">
       <View className="crumb-row">
         <Button className="crumb-btn" onClick={() => Taro.navigateBack()}>
           返回任务列表
@@ -1321,7 +1315,12 @@ export default function TaskDetailPage() {
       </View>
 
       <View className={`task-shell ${summaryOpen ? "is-open" : ""}`}>
-        <Button className="card-hit task-shell-toggle" onClick={() => setSummaryOpen((value) => !value)}>
+        <Button
+          className="card-hit task-shell-toggle"
+          data-testid="mobile-task-summary-toggle"
+          aria-expanded={summaryOpen}
+          onClick={() => setSummaryOpen((value) => !value)}
+        >
           <View className="task-top">
             <View className="task-main">
               <View className="task-shell-title">{task.title}</View>
@@ -1636,7 +1635,7 @@ export default function TaskDetailPage() {
         </View>
       ) : null}
 
-      {liveMode ? (
+      {liveMode && summaryOpen ? (
         <View className="module-card">
           <View className="section-head">
             <View>
@@ -1712,7 +1711,7 @@ export default function TaskDetailPage() {
         </View>
       ) : null}
 
-      {liveMode ? (
+      {liveMode && summaryOpen ? (
         <View className="module-card">
           <View className="section-head">
             <View>
@@ -2182,8 +2181,20 @@ export default function TaskDetailPage() {
                 ) : null}
                 {activeCapture.status === "CAPTURED" ? (
                   <>
-                    <View className="capture-mobile-success">Capture 已验证，Draft 已进入 Creator 工作台。</View>
-                    <Button className="send-btn" onClick={openCreatorDashboard}>前往 Dashboard 审核</Button>
+                    <View className="capture-mobile-success">Capture 已验证，Draft 已进入当前项目的固化流程。</View>
+                    <Button
+                      className="send-btn"
+                      onClick={() => {
+                        const projectId = liveSnapshot?.run.sessionProjectId;
+                        Taro.navigateTo({
+                          url: projectId
+                            ? `/pages/creator/project?id=${encodeURIComponent(projectId)}`
+                            : "/pages/creator/projects",
+                        });
+                      }}
+                    >
+                      审核并固化
+                    </Button>
                   </>
                 ) : null}
               </View>

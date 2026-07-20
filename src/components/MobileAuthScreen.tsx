@@ -1,10 +1,12 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button, Image, Input, View } from "@tarojs/components";
-import logoMark from "../assets/logo-ui.png";
-import { mobileAuthApi } from "../lib/api";
+import Taro from "@tarojs/taro";
+import { mobileApiConfigured, mobileAuthApi } from "../lib/api";
+import { mobileLogoSource } from "../lib/mobileAssets";
 import { useMobileAuthStore } from "../stores/mobileAuthStore";
 import { useMobileUiStore } from "../stores/mobileUiStore";
+import { MobilePageShell } from "./MobilePageShell";
 
 type AuthMode = "login" | "register";
 
@@ -22,6 +24,8 @@ const initialFormState: AuthFormState = {
   password: "",
 };
 
+const isWechatMiniProgram = process.env.TARO_ENV === "weapp";
+
 export function MobileAuthScreen() {
   const theme = useMobileUiStore((state) => state.theme);
   const setCurrentWorkspaceId = useMobileUiStore(
@@ -34,6 +38,18 @@ export function MobileAuthScreen() {
   const queryClient = useQueryClient();
   const [mode, setMode] = useState<AuthMode>("login");
   const [form, setForm] = useState<AuthFormState>(initialFormState);
+
+  const applyAuthenticatedSession = async (
+    response: Awaited<ReturnType<typeof mobileAuthApi.login>>
+  ) => {
+    applySessionResponse(response);
+    setCurrentWorkspaceId(response.currentWorkspace.workspaceId);
+    await queryClient.removeQueries({
+      queryKey: ["mobile"],
+    });
+    await Taro.switchTab({ url: "/pages/workshops/index" });
+    await Taro.showTabBar({ animation: false });
+  };
 
   const authMutation = useMutation({
     mutationFn: async () => {
@@ -51,13 +67,36 @@ export function MobileAuthScreen() {
         password: form.password,
       });
     },
-    onSuccess: async (response) => {
-      applySessionResponse(response);
-      setCurrentWorkspaceId(response.currentWorkspace.workspaceId);
-      await queryClient.removeQueries({
-        queryKey: ["mobile"],
-      });
+    onSuccess: applyAuthenticatedSession,
+  });
+
+  const wechatAuthMutation = useMutation({
+    mutationFn: async () => {
+      if (!mobileApiConfigured) {
+        throw new Error("小程序服务地址尚未配置");
+      }
+
+      let loginResult: Taro.login.SuccessCallbackResult;
+      try {
+        loginResult = await Taro.login({ timeout: 10_000 });
+      } catch (error) {
+        console.error("[wechat-auth] Failed to obtain a WeChat login code.", error);
+        throw error;
+      }
+      if (!loginResult.code) {
+        throw new Error("微信未返回有效登录凭证");
+      }
+
+      try {
+        return await mobileAuthApi.loginWithWechatMiniProgram({
+          code: loginResult.code,
+        });
+      } catch (error) {
+        console.error("[wechat-auth] Failed to exchange the WeChat login code.", error);
+        throw error;
+      }
     },
+    onSuccess: applyAuthenticatedSession,
   });
 
   const disabled = useMemo(() => {
@@ -73,146 +112,193 @@ export function MobileAuthScreen() {
   }, [form.displayName, form.email, form.password, mode]);
 
   const errorText =
-    authMutation.error instanceof Error
+    wechatAuthMutation.error instanceof Error
+      ? wechatAuthMutation.error.message
+      : authMutation.error instanceof Error
       ? authMutation.error.message
       : bootstrapError;
 
   return (
-    <View className="auth-screen-overlay">
-      <View className="page-shell auth-screen-shell">
+    <View className={`auth-screen-overlay theme-${theme}`}>
+      <MobilePageShell className="auth-screen-shell">
         <View className="page auth-screen-page active">
           <View className="hero-card auth-screen-card">
-            <View className="card-row">
+            <View className="auth-brand-row">
               <View className="brand-row">
                 <View className="brand-mark auth-brand-mark">
-                  <Image src={logoMark} mode="aspectFit" />
+                  <Image
+                    className="brand-logo-image"
+                    src={mobileLogoSource}
+                    mode="aspectFit"
+                    style={{ width: "100%", height: "100%" }}
+                  />
                 </View>
                 <View>
-                  <View className="page-eyebrow">灵办词元 / 账户登录</View>
-                  <View className="section-title">进入你的当前空间</View>
-                  <View className="section-copy">
-                    登录后即可在 H5 中直接启动实例、持续对话、浏览任务文件，并切换到你的个人或企业工作区。
-                  </View>
+                  <View className="page-eyebrow">灵办词元</View>
+                  <View className="auth-product-line">Agent 工作流工坊</View>
                 </View>
               </View>
-              <Button className="pill" onClick={() => useMobileUiStore.getState().toggleTheme()}>
-                {theme === "dark" ? "深色" : "浅色"}
+              <Button
+                className="auth-theme-button"
+                data-testid="mobile-auth-theme-toggle"
+                aria-label={theme === "dark" ? "切换浅色模式" : "切换深色模式"}
+                onClick={() => useMobileUiStore.getState().toggleTheme()}
+              >
+                {theme === "dark" ? "☀" : "☾"}
               </Button>
             </View>
 
-            <View className="pill-row auth-toggle-row">
-              <Button
-                className={`task-chip ${mode === "login" ? "active" : ""}`}
-                onClick={() => setMode("login")}
-              >
-                登录
-              </Button>
-              <Button
-                className={`task-chip ${mode === "register" ? "active" : ""}`}
-                onClick={() => setMode("register")}
-              >
-                注册
-              </Button>
-            </View>
-
-            {mode === "register" ? (
+            {isWechatMiniProgram ? (
               <>
-                <View className="search-bar">
-                  <Input
-                    className="search-input"
-                    value={form.displayName}
-                    placeholder="显示名称，例如：内容运营组 / 张宁"
-                    onInput={(event) =>
-                      setForm((current) => ({
-                        ...current,
-                        displayName: event.detail.value,
-                      }))
-                    }
-                  />
+                <View className="auth-heading-block">
+                  <View className="auth-title">进入你的 Agent 工作台</View>
+                  <View className="section-copy">
+                    浏览工坊、启动云端实例，并在任务对话中持续补充信息和接收文件。
+                  </View>
                 </View>
-                <View className="search-bar">
-                  <Input
-                    className="search-input"
-                    value={form.workspaceName}
-                    placeholder="个人工作区名称，可留空自动生成"
-                    onInput={(event) =>
-                      setForm((current) => ({
-                        ...current,
-                        workspaceName: event.detail.value,
-                      }))
-                    }
-                  />
+                <Button
+                  className="wechat-login-btn"
+                  data-testid="mobile-wechat-login"
+                  disabled={
+                    !mobileApiConfigured ||
+                    wechatAuthMutation.isPending ||
+                    authMutation.isPending
+                  }
+                  onClick={() => wechatAuthMutation.mutate()}
+                >
+                  <View className="wechat-login-mark" aria-hidden>
+                    <View className="wechat-bubble primary" />
+                    <View className="wechat-bubble secondary" />
+                  </View>
+                  {wechatAuthMutation.isPending ? "微信登录中" : "微信登录"}
+                </Button>
+                <View className="auth-login-note">
+                  登录即表示同意平台服务协议与隐私规则。账户将自动进入对应的个人或企业工作区。
                 </View>
+                {errorText ? <View className="auth-error-banner">{errorText}</View> : null}
               </>
-            ) : null}
-
-            <View className="search-bar">
-              <Input
-                className="search-input"
-                type="text"
-                value={form.email}
-                placeholder="邮箱"
-                onInput={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    email: event.detail.value,
-                  }))
-                }
-              />
-            </View>
-            <View className="search-bar">
-              <Input
-                className="search-input"
-                password
-                value={form.password}
-                placeholder={mode === "register" ? "密码，至少 12 位" : "密码"}
-                onInput={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    password: event.detail.value,
-                  }))
-                }
-              />
-            </View>
-
-            {errorText ? <View className="auth-error-banner">{errorText}</View> : null}
-
-            <Button
-              className="auth-submit-btn"
-              disabled={disabled || authMutation.isPending}
-              onClick={() => authMutation.mutate()}
-            >
-              {authMutation.isPending
-                ? "处理中"
-                : mode === "register"
-                  ? "创建工作区并进入"
-                  : "进入灵办词元"}
-            </Button>
+            ) : (
+              <>
+                <View className="auth-heading-block">
+                  <View className="auth-title">进入你的 Agent 工作台</View>
+                  <View className="section-copy">
+                    启动实例、持续对话、浏览任务文件，并切换个人或企业工作区。
+                  </View>
+                </View>
+                <View className="pill-row auth-toggle-row">
+                  <Button
+                    className={`task-chip ${mode === "login" ? "active" : ""}`}
+                    onClick={() => setMode("login")}
+                  >
+                    登录
+                  </Button>
+                  <Button
+                    className={`task-chip ${mode === "register" ? "active" : ""}`}
+                    onClick={() => setMode("register")}
+                  >
+                    注册
+                  </Button>
+                </View>
+                {mode === "register" ? (
+                  <>
+                    <View className="search-bar">
+                      <Input
+                        className="search-input"
+                        value={form.displayName}
+                        placeholder="显示名称"
+                        onInput={(event) =>
+                          setForm((current) => ({
+                            ...current,
+                            displayName: event.detail.value,
+                          }))
+                        }
+                      />
+                    </View>
+                    <View className="search-bar">
+                      <Input
+                        className="search-input"
+                        value={form.workspaceName}
+                        placeholder="个人工作区名称，可留空"
+                        onInput={(event) =>
+                          setForm((current) => ({
+                            ...current,
+                            workspaceName: event.detail.value,
+                          }))
+                        }
+                      />
+                    </View>
+                  </>
+                ) : null}
+                <View className="search-bar">
+                  <Input
+                    className="search-input"
+                    type="text"
+                    value={form.email}
+                    placeholder="邮箱"
+                    onInput={(event) =>
+                      setForm((current) => ({
+                        ...current,
+                        email: event.detail.value,
+                      }))
+                    }
+                  />
+                </View>
+                <View className="search-bar">
+                  <Input
+                    className="search-input"
+                    password
+                    value={form.password}
+                    placeholder={mode === "register" ? "密码，至少 12 位" : "密码"}
+                    onInput={(event) =>
+                      setForm((current) => ({
+                        ...current,
+                        password: event.detail.value,
+                      }))
+                    }
+                  />
+                </View>
+                {errorText ? <View className="auth-error-banner">{errorText}</View> : null}
+                <Button
+                  className="auth-submit-btn"
+                  disabled={disabled || authMutation.isPending}
+                  onClick={() => authMutation.mutate()}
+                >
+                  {authMutation.isPending
+                    ? "处理中"
+                    : mode === "register"
+                      ? "创建工作区并进入"
+                      : "进入灵办词元"}
+                </Button>
+              </>
+            )}
           </View>
 
-          <View className="profile-grid auth-helper-grid">
+          <View className="auth-capability-list">
             {[
               {
-                title: "实例隔离",
-                note: "每个任务实例进入独立运行环境，关闭后自动销毁。",
+                title: "独立实例",
+                note: "每个任务使用隔离的运行环境",
               },
               {
-                title: "完整对话",
-                note: "任务运行期间可以持续追问、补材料、继续给 Codex 下指令。",
+                title: "持续对话",
+                note: "随时追问、补充材料和确认操作",
               },
               {
-                title: "文件边界",
-                note: "结果文件、下载路径和工作目录全部受当前工作区控制。",
+                title: "文件可见",
+                note: "结果文件归档在当前工作区",
               },
             ].map((item) => (
-              <View className="mini-card auth-helper-card" key={item.title}>
-                <View className="page-eyebrow">{item.title}</View>
-                <View className="muted">{item.note}</View>
+              <View className="auth-capability-row" key={item.title}>
+                <View className="auth-capability-dot" />
+                <View>
+                  <View className="auth-capability-title">{item.title}</View>
+                  <View className="auth-capability-note">{item.note}</View>
+                </View>
               </View>
             ))}
           </View>
         </View>
-      </View>
+      </MobilePageShell>
     </View>
   );
 }
