@@ -129,15 +129,16 @@ Session Capture does not add a bottom navigation tab. The product navigation rem
 
 ## 当前状态 / Current Status
 
-截至 2026-07-19，H5 已接入认证、工作区、工坊、服务、任务、实时对话、上传、文件、审批、Provider 选择、配额摘要、Session Capture 与个人中心主链。微信小程序生产构建、`Taro.login` 登录入口、统一认证令牌接入与请求运行时已完成。
+截至 2026-07-21，H5 已接入认证、工作区、工坊、服务、任务、实时对话、上传、文件、审批、Provider 选择、配额摘要、Session Capture、实例生命周期与个人中心主链。微信小程序生产构建、`Taro.login` 登录入口、统一认证令牌、请求运行时和实例生命周期入口已完成。
 
-As of 2026-07-19, the H5 client covers the complete mobile workflow. The WeChat Mini Program production build, `Taro.login` entry point, shared authentication tokens, and request runtime are implemented.
+As of 2026-07-21, the H5 client covers the complete mobile workflow, including run lifecycle management. The WeChat Mini Program production build, `Taro.login` entry point, shared authentication tokens, request runtime, and lifecycle actions are implemented.
 
 | 验证项 | 结果 |
 | --- | --- |
 | TypeScript | 通过 |
 | H5 production build | 通过 |
 | WeChat Mini Program production build | 通过 |
+| 最新微信交付产物 | 60 个文件，`1,223,636 Byte`，构建于 2026-07-21 |
 | Public API health | `GET https://codex-miniapp.sidcloud.cn/health` 返回 `200` |
 | WeChat login API local smoke | 通过 |
 | Public WeChat login route | 已部署；无效 code 返回 `401 / AUTH_WECHAT_CODE_INVALID / 40029` |
@@ -147,6 +148,14 @@ As of 2026-07-19, the H5 client covers the complete mobile workflow. The WeChat 
 | Playwright Dashboard/Admin/H5 E2E | 33/33 通过 |
 | Mobile 页面状态视觉检查 | 14/14 通过 |
 | 当前验收地址 | `http://192.168.31.20:38120/` |
+
+## 微信小程序交付包 / WeChat Mini Program Deliverable
+
+微信开发者工具可直接导入 `app/mobile/dist`。该目录的 `project.config.json` 使用 `miniprogramRoot: "./"`，AppID 为 `wx4b21e9b9200dcf9b`，基础库固定为 `3.15.2`。
+
+发布快照同时保留独立目录 `release/mini-program/lingban-weapp-20260721` 和压缩包 `release/mini-program/lingban-weapp-20260721.zip`。压缩包解压后可直接作为微信开发者工具项目导入。
+
+WeChat Developer Tools can import `app/mobile/dist` directly. The release snapshot also contains a standalone directory and ZIP package whose root includes `app.js`, `app.json`, `app.wxss`, and `project.config.json`.
 
 微信认证后端与公网路由已上线。当前使用 `灵办` 微信小程序凭证，并需在微信公众平台登记 `https://codex-miniapp.sidcloud.cn` 为 `request` 合法域名。文件上传、下载、预览和订阅消息需要继续完成微信端专项适配。支付宝端能力保持后续计划。
 
