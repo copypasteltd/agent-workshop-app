@@ -129,10 +129,19 @@ for (const marker of [
 }
 
 for (const filePath of listSourceFiles(path.join(projectRoot, "src"))) {
+  const source = readFileSync(filePath, "utf8");
+  for (const match of source.matchAll(/confirmText\s*:\s*["']([^"']+)["']/g)) {
+    const label = match[1];
+    const weightedLength = label.replace(/[\u0391-\uFFE5]/g, "aa").length;
+    if (weightedLength > 8) {
+      throw new Error(
+        `WeChat confirmText exceeds the platform limit: ${path.relative(projectRoot, filePath)} -> ${label}`
+      );
+    }
+  }
   if (filePath === path.join(projectRoot, "src", "lib", "useMobileQuery.ts")) {
     continue;
   }
-  const source = readFileSync(filePath, "utf8");
   if (
     /import\s*\{[^}]*\buseQuery\b[^}]*\}\s*from\s*["']@tanstack\/react-query["']/.test(
       source

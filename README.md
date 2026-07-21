@@ -138,14 +138,14 @@ As of 2026-07-21, the H5 client covers the complete mobile workflow, including r
 | TypeScript | 通过 |
 | H5 production build | 通过 |
 | WeChat Mini Program production build | 通过 |
-| 最新微信交付产物 | 60 个文件，`1,223,636 Byte`，构建于 2026-07-21 |
+| 最新微信交付产物 | `r2`，60 个文件，`1,223,977 Byte`，构建于 2026-07-21 |
 | Public API health | `GET https://codex-miniapp.sidcloud.cn/health` 返回 `200` |
 | WeChat login API local smoke | 通过 |
 | Public WeChat login route | 已部署；无效 code 返回 `401 / AUTH_WECHAT_CODE_INVALID / 40029` |
 | Current AppID account type | `gameApp=false / appType=0 / compileType=weapp` |
-| WeChat Developer Tools Preview | 2026-07-21 通过，官方 CLI 预览包 `1,225,492 Byte` |
+| WeChat Developer Tools Preview | 2026-07-21 通过，官方 CLI 预览包 `1,225,833 Byte` |
 | Real WeChat login | 两次 `wx.login` code 均成功换取会话，并复用用户 `usr_00000012` 与工作区 `wsp_00000012` |
-| Playwright Dashboard/Admin/H5 E2E | 33/33 通过 |
+| Playwright Dashboard/Admin/H5 E2E | 34/34 通过，包含实例停止与释放链路 |
 | Mobile 页面状态视觉检查 | 14/14 通过 |
 | 当前验收地址 | `http://192.168.31.20:38120/` |
 
@@ -153,7 +153,7 @@ As of 2026-07-21, the H5 client covers the complete mobile workflow, including r
 
 微信开发者工具可直接导入 `app/mobile/dist`。该目录的 `project.config.json` 使用 `miniprogramRoot: "./"`，AppID 为 `wx4b21e9b9200dcf9b`，基础库固定为 `3.15.2`。
 
-发布快照同时保留独立目录 `release/mini-program/lingban-weapp-20260721` 和压缩包 `release/mini-program/lingban-weapp-20260721.zip`。压缩包解压后可直接作为微信开发者工具项目导入。
+最新发布快照保留独立目录 `release/mini-program/lingban-weapp-20260721-r2` 和压缩包 `release/mini-program/lingban-weapp-20260721-r2.zip`。压缩包解压后可直接作为微信开发者工具项目导入。
 
 WeChat Developer Tools can import `app/mobile/dist` directly. The release snapshot also contains a standalone directory and ZIP package whose root includes `app.js`, `app.json`, `app.wxss`, and `project.config.json`.
 
@@ -188,3 +188,11 @@ The Creator pages now apply explicit cross-platform component classes, stable fo
 如果微信开发者工具同时加载旧页面块和新公共块，应关闭项目与 IDE，清理该项目的 `WeappCompileCache` 后重新执行 `pnpm build:weapp` 和预览。`scripts/verify-weapp-build.mjs` 会校验基础库版本、API 地址、直接查询适配层和页面查询边界。
 
 The WeChat runtime dispatches API calls through a dedicated lifecycle adapter while H5 retains TanStack Query. Route-bound pages mount their query content after Taro exposes route parameters. Production verification pins base library `3.15.2` and rejects direct TanStack `useQuery` calls in WeChat pages.
+
+## 2026-07-21 Lifecycle Confirmation / 2026-07-21 生命周期确认
+
+任务列表与任务详情的停止确认按钮统一使用 4 字文案“确认停止”，满足 Taro H5 与微信小程序 `showModal.confirmText` 长度限制。ActionSheet 取消仅结束菜单交互，弹窗创建失败会显示错误提示，业务动作异常不会被菜单取消逻辑吞掉。
+
+微信构建校验会扫描所有 `confirmText` 常量并按平台加权长度规则拒绝超限文案。H5 E2E 会打开生命周期菜单、确认停止、断言 `POST /v1/runs/:runId/stop` 的 `graceful` 请求，并检查页面进入“运行环境已释放”状态。
+
+Task-list and task-detail stop confirmations use a platform-compliant four-character label. Build verification rejects oversized modal labels, while H5 E2E asserts the stop request and released runtime state.

@@ -840,12 +840,21 @@ function TaskDetailContent({ id }: { id?: string }) {
   });
   const confirmStop = async () => {
     if (!task) return;
-    const result = await Taro.showModal({
-      title: "立即停止实例",
-      content: "当前执行将被中断，已写入工作目录的文件会保留。运行环境释放后仍可查看消息和结果。",
-      confirmText: "停止并释放",
-      confirmColor: "#d84b4b",
-    });
+    let result;
+    try {
+      result = await Taro.showModal({
+        title: "立即停止实例",
+        content: "当前执行将被中断，已写入工作目录的文件会保留。运行环境释放后仍可查看消息和结果。",
+        confirmText: "确认停止",
+        confirmColor: "#d84b4b",
+      });
+    } catch (error) {
+      await Taro.showToast({
+        title: error instanceof Error ? error.message : "停止确认弹窗打开失败",
+        icon: "none",
+      });
+      return;
+    }
     if (result.confirm) stopMutation.mutate(task.id);
   };
   const confirmDelete = async () => {
@@ -874,12 +883,14 @@ function TaskDetailContent({ id }: { id?: string }) {
       actions.push({ label: "永久删除实例", run: confirmDelete });
     }
     if (actions.length === 0) return;
+    let result;
     try {
-      const result = await Taro.showActionSheet({ itemList: actions.map((item) => item.label) });
-      await actions[result.tapIndex]?.run();
+      result = await Taro.showActionSheet({ itemList: actions.map((item) => item.label) });
     } catch {
       // The user dismissed the action sheet.
+      return;
     }
+    await actions[result.tapIndex]?.run();
   };
   useMobileRecentRecorder(
     task && liveMode && currentWorkspace.source === "auth"

@@ -110,14 +110,23 @@ export default function TasksPage() {
     onError: (error) => Taro.showToast({ title: error instanceof Error ? error.message : "实例操作失败", icon: "none" }),
   });
   const confirmListAction = async (runId: string, action: "stop" | "delete") => {
-    const result = await Taro.showModal({
-      title: action === "stop" ? "立即停止实例" : "永久删除实例",
-      content: action === "stop"
-        ? "当前执行将被中断，运行环境完成释放后仍可查看消息和结果。"
-        : `实例 ${runId} 的消息、文件与运行记录将被清理，该操作无法撤销。`,
-      confirmText: action === "stop" ? "停止并释放" : "永久删除",
-      confirmColor: "#d84b4b",
-    });
+    let result;
+    try {
+      result = await Taro.showModal({
+        title: action === "stop" ? "立即停止实例" : "永久删除实例",
+        content: action === "stop"
+          ? "当前执行将被中断，运行环境完成释放后仍可查看消息和结果。"
+          : `实例 ${runId} 的消息、文件与运行记录将被清理，该操作无法撤销。`,
+        confirmText: action === "stop" ? "确认停止" : "永久删除",
+        confirmColor: "#d84b4b",
+      });
+    } catch (error) {
+      await Taro.showToast({
+        title: error instanceof Error ? error.message : "操作确认弹窗打开失败",
+        icon: "none",
+      });
+      return;
+    }
     if (result.confirm) lifecycleMutation.mutate({ runId, action });
   };
   const openTaskLifecycleMenu = async (runId: string) => {
@@ -135,12 +144,14 @@ export default function TasksPage() {
     } else {
       items.push({ label: "立即停止并释放", execute: () => confirmListAction(runId, "stop") });
     }
+    let result;
     try {
-      const result = await Taro.showActionSheet({ itemList: items.map((item) => item.label) });
-      await items[result.tapIndex]?.execute();
+      result = await Taro.showActionSheet({ itemList: items.map((item) => item.label) });
     } catch {
       // The user dismissed the action sheet.
+      return;
     }
+    await items[result.tapIndex]?.execute();
   };
 
   const statusOptions = [
