@@ -141,12 +141,12 @@ As of 2026-07-21, the H5 client covers the complete mobile workflow, including r
 | TypeScript | 通过 |
 | H5 production build | 通过 |
 | WeChat Mini Program production build | 通过 |
-| 最新微信交付产物 | `r3`，60 个文件，`1,219,512 Byte`，SHA-256 `0FF96CF88DF32303BFF15C92234E1C6B5B222847620449D50119776492A06E0A` |
+| 最新微信交付产物 | `r4`，60 个文件，`1,223,518 Byte`，SHA-256 `FB46E12C4A1497710D0EA56FAD665785F4277FF7CFFACDC9D67D61B6916481D2` |
 | Public API health | `GET https://codex-miniapp.sidcloud.cn/health` 返回 `200` |
 | WeChat login API local smoke | 通过 |
 | Public WeChat login route | 已部署；无效 code 返回 `401 / AUTH_WECHAT_CODE_INVALID / 40029` |
 | Current AppID account type | `gameApp=false / appType=0 / compileType=weapp` |
-| WeChat Developer Tools Preview | 2026-07-21 通过，官方 CLI 预览包 `1,225,833 Byte` |
+| WeChat Developer Tools Preview | 2026-07-22 通过，官方 CLI 预览包 `1,225,374 Byte` |
 | Real WeChat login | 两次 `wx.login` code 均成功换取会话，并复用用户 `usr_00000012` 与工作区 `wsp_00000012` |
 | Playwright Dashboard/Admin/H5 E2E | 34/34 通过，包含实例停止与释放链路 |
 | Mobile 页面状态视觉检查 | 14/14 通过 |
@@ -156,13 +156,22 @@ As of 2026-07-21, the H5 client covers the complete mobile workflow, including r
 
 微信开发者工具可直接导入 `app/mobile/dist`。该目录的 `project.config.json` 使用 `miniprogramRoot: "./"`，AppID 为 `wx4b21e9b9200dcf9b`，基础库固定为 `3.15.2`。
 
-最新发布快照保留独立目录 `release/mini-program/lingban-weapp-20260721-r3` 和压缩包 `release/mini-program/lingban-weapp-20260721-r3.zip`。压缩包解压后可直接作为微信开发者工具项目导入，服务器下载地址为 `http://192.168.31.20:38120/downloads/lingban-weapp-20260721-r3.zip`。
+最新发布快照保留独立目录 `release/mini-program/lingban-weapp-20260722-r4` 和压缩包 `release/mini-program/lingban-weapp-20260722-r4.zip`。压缩包解压后可直接作为微信开发者工具项目导入，服务器下载地址为 `http://192.168.31.20:38120/downloads/lingban-weapp-20260722-r4.zip`。
 
 WeChat Developer Tools can import `app/mobile/dist` directly. The release snapshot also contains a standalone directory and ZIP package whose root includes `app.js`, `app.json`, `app.wxss`, and `project.config.json`.
 
 微信认证后端与公网路由已上线。当前使用 `灵办` 微信小程序凭证，并需在微信公众平台登记 `https://codex-miniapp.sidcloud.cn` 为 `request` 合法域名。文件上传、下载、预览和订阅消息需要继续完成微信端专项适配。支付宝端能力保持后续计划。
 
 Credentialed WeChat device testing, file APIs, subscription messages, and review configuration remain before production submission.
+
+## 微信分享 / WeChat Sharing
+
+- 工坊首页、工坊详情和服务详情支持右上角菜单转发、页面内转发按钮及朋友圈分享。
+- 工坊与服务详情分享会保留资源 ID；已登录用户直接进入详情，未登录用户完成微信登录后恢复分享目标。
+- 任务会话、任务文件、Creator 和账户页面禁止分享，避免工作区消息、文件和运行状态进入外部分享链路。
+- 分享接收方仍需通过 API 工作区权限校验，分享链接不会放宽目录可见范围。
+
+Workshop discovery and service detail pages support WeChat friend and Timeline sharing with authenticated deep-link restoration. Private task, Creator, file, and account surfaces remain outside the sharing boundary.
 
 ## 2026-07-20 Creator Loop / 2026-07-20 Creator 闭环
 

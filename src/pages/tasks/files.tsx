@@ -16,6 +16,7 @@ import { useMobileRunStream } from "../../lib/runStream";
 import { useResolvedMobileWorkspace } from "../../lib/useMobileWorkspace";
 import { useMobileRouteParams } from "../../lib/useMobileRouteParams";
 import { useMobilePageShellClass } from "../../components/MobilePageShell";
+import { useMobileShareDisabled } from "../../lib/mobileShare";
 
 function ensureTrailingSlash(value: string) {
   return value.endsWith("/") ? value : `${value}/`;
@@ -114,6 +115,7 @@ function toTestIdSegment(value: string) {
 }
 
 export default function TaskFilesPage() {
+  useMobileShareDisabled();
   const params = useMobileRouteParams<{ id?: string }>();
   const pageShellClass = useMobilePageShellClass();
   if (!params) {

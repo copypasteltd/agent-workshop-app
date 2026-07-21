@@ -47,8 +47,6 @@ export function MobileAuthScreen() {
     await queryClient.removeQueries({
       queryKey: ["mobile"],
     });
-    await Taro.switchTab({ url: "/pages/workshops/index" });
-    await Taro.showTabBar({ animation: false });
   };
 
   const authMutation = useMutation({

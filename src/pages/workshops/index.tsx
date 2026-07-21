@@ -13,6 +13,7 @@ import { mobileLogoSource } from "../../lib/mobileAssets";
 import { useMobilePageShellClass } from "../../components/MobilePageShell";
 import { useResolvedMobileWorkspace } from "../../lib/useMobileWorkspace";
 import { useMobileWorkspaceCatalog } from "../../lib/useMobileWorkspaceCatalog";
+import { mobileNativeShareEnabled, useMobileShare } from "../../lib/mobileShare";
 
 const workshopCoverMap: Record<string, string> = {
   "enterprise-tax": workshopTax,
@@ -73,6 +74,11 @@ export default function WorkshopsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [surfaceFilter, setSurfaceFilter] = useState<WorkshopSurfaceFilter>("all");
   const currentWorkspace = useResolvedMobileWorkspace();
+  useMobileShare({
+    title: "灵办词元：随时启动可复用的 Agent 工作流",
+    timelineTitle: "灵办词元 Agent 工作流工坊",
+    route: "/pages/workshops/index",
+  });
   const favoritesEnabled = currentWorkspace.source === "auth";
   const trimmedSearchQuery = searchQuery.trim();
   const deferredSearchQuery = useDeferredValue(trimmedSearchQuery);
@@ -393,6 +399,11 @@ export default function WorkshopsPage() {
               >
                 去我的
               </Button>
+              {mobileNativeShareEnabled ? (
+                <Button className="pill" openType="share" data-testid="mobile-workshops-share">
+                  分享工坊
+                </Button>
+              ) : null}
               <View className="workshop-guidance">可从现有服务启动，也可创建空白 Codex 并固化为新服务</View>
           </View>
         </View>

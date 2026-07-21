@@ -4,6 +4,7 @@ import { Button, Input, View } from "@tarojs/components";
 import Taro from "@tarojs/taro";
 import { useMemo, useState } from "react";
 import { useMobilePageShellClass } from "../../components/MobilePageShell";
+import { useMobileShareDisabled } from "../../lib/mobileShare";
 import { mobileSessionProjectsApi } from "../../lib/api";
 import {
   canCreateMobileSourceRun,
@@ -40,6 +41,7 @@ function formatTime(value: string) {
 }
 
 export default function CreatorProjectsPage() {
+  useMobileShareDisabled();
   const pageShellClass = useMobilePageShellClass("creator-page-shell");
   const currentWorkspace = useResolvedMobileWorkspace();
   const workspaceReady = hasAuthoritativeMobileWorkspaceContext(currentWorkspace);

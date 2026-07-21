@@ -173,7 +173,62 @@ const sourceProject = JSON.parse(
 const outputProject = JSON.parse(
   readFileSync(path.join(distRoot, "project.config.json"), "utf8")
 );
-JSON.parse(readFileSync(path.join(distRoot, "app.json"), "utf8"));
+const appConfig = JSON.parse(readFileSync(path.join(distRoot, "app.json"), "utf8"));
+
+const shareablePages = [
+  "pages/workshops/index",
+  "pages/workshops/detail",
+  "pages/services/detail",
+];
+for (const pagePath of shareablePages) {
+  if (!appConfig.pages.includes(pagePath)) {
+    throw new Error(`Missing shareable page registration: ${pagePath}`);
+  }
+  const pageSource = readFileSync(path.join(distRoot, `${pagePath}.js`), "utf8");
+  if (
+    !/enableShareAppMessage\s*[:=]\s*!0/.test(pageSource) ||
+    !/enableShareTimeline\s*[:=]\s*!0/.test(pageSource)
+  ) {
+    throw new Error(`WeChat sharing is not fully enabled for: ${pagePath}`);
+  }
+}
+
+for (const pagePath of [
+  "pages/auth/index",
+  "pages/tasks/index",
+  "pages/tasks/new",
+  "pages/tasks/detail",
+  "pages/tasks/files",
+  "pages/creator/projects",
+  "pages/creator/project",
+  "pages/creator/draft",
+  "pages/creator/publish",
+  "pages/me/index",
+]) {
+  const pageSource = readFileSync(path.join(distRoot, `${pagePath}.js`), "utf8");
+  if (
+    /enableShareAppMessage\s*[:=]\s*!0/.test(pageSource) ||
+    /enableShareTimeline\s*[:=]\s*!0/.test(pageSource)
+  ) {
+    throw new Error(`Private mobile page unexpectedly enables sharing: ${pagePath}`);
+  }
+  if (!pageSource.includes("useMobileShareDisabled")) {
+    throw new Error(`Private mobile page does not hide the WeChat share menu: ${pagePath}`);
+  }
+}
+
+const shareSource = readFileSync(path.join(distRoot, "common.js"), "utf8");
+for (const marker of [
+  "lingban:mobile:pending-share-route",
+  "/pages/workshops/detail",
+  "/pages/services/detail",
+  "shareAppMessage",
+  "shareTimeline",
+]) {
+  if (!shareSource.includes(marker)) {
+    throw new Error(`Missing WeChat sharing runtime marker: ${marker}`);
+  }
+}
 
 if (sourceProject.libVersion !== "3.15.2" || outputProject.libVersion !== "3.15.2") {
   throw new Error(

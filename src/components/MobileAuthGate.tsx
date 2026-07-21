@@ -3,7 +3,7 @@ import type {
   AuthDisabledSessionBootstrap,
   AuthSessionEnvelope,
 } from "@lingban/contracts";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import Taro from "@tarojs/taro";
 import {
   mobileApiBaseUrl,
@@ -13,6 +13,10 @@ import {
 import { inferMobileWorkspaceContextKey } from "../lib/workspaceContext";
 import { useMobileAuthStore } from "../stores/mobileAuthStore";
 import { useMobileUiStore } from "../stores/mobileUiStore";
+import {
+  consumePendingMobileShareRoute,
+  rememberPendingMobileShareRoute,
+} from "../lib/mobileShare";
 
 const mobileE2eAuthMode = process.env.TARO_APP_E2E_AUTH_MODE?.trim();
 
@@ -104,6 +108,7 @@ export function MobileAuthGate({ children }: PropsWithChildren) {
   const authMode = useMobileAuthStore((state) => state.authMode);
   const authenticated = useMobileAuthStore((state) => state.authenticated);
   const bootstrapping = useMobileAuthStore((state) => state.bootstrapping);
+  const navigationPendingRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -185,14 +190,38 @@ export function MobileAuthGate({ children }: PropsWithChildren) {
     const authRoute = "pages/auth/index";
 
     if (authMode === "required" && !authenticated && currentRoute !== authRoute) {
+      navigationPendingRef.current = false;
+      const currentPage = pages[pages.length - 1] as {
+        options?: Partial<Record<string, string>>;
+      } | undefined;
+      const routerParams = Taro.getCurrentInstance().router?.params as
+        | Partial<Record<string, string>>
+        | undefined;
+      rememberPendingMobileShareRoute(currentRoute, {
+        ...currentPage?.options,
+        ...routerParams,
+      });
       void Taro.reLaunch({ url: `/${authRoute}` });
       return;
+    }
+
+    if (authMode === "required" && !authenticated) {
+      navigationPendingRef.current = false;
     }
 
     if (
       (authMode === "disabled" || authenticated) &&
       currentRoute === authRoute
     ) {
+      if (navigationPendingRef.current) {
+        return;
+      }
+      navigationPendingRef.current = true;
+      const pendingShareRoute = consumePendingMobileShareRoute();
+      if (pendingShareRoute && pendingShareRoute !== "/pages/workshops/index") {
+        void Taro.reLaunch({ url: pendingShareRoute });
+        return;
+      }
       void Taro.switchTab({ url: "/pages/workshops/index" }).then(() =>
         Taro.showTabBar({ animation: false })
       );

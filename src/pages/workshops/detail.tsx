@@ -18,6 +18,7 @@ import { useResolvedMobileWorkspace } from "../../lib/useMobileWorkspace";
 import { useMobileRouteParams } from "../../lib/useMobileRouteParams";
 import { hasAuthoritativeMobileWorkspaceContext } from "../../lib/workspaceContext";
 import { useMobilePageShellClass } from "../../components/MobilePageShell";
+import { mobileNativeShareEnabled, useMobileShare } from "../../lib/mobileShare";
 
 const workshopCoverMap: Record<string, string> = {
   "enterprise-tax": workshopTax,
@@ -70,6 +71,11 @@ function WorkshopDetailContent({ id }: { id?: string }) {
     () => (workshopQuery.data ? mapWorkshopCatalogEntryToMobileWorkshop(workshopQuery.data) : null),
     [workshopQuery.data]
   );
+  useMobileShare({
+    title: workshop ? `${workshop.name}｜灵办词元` : "灵办词元 Agent 工作流工坊",
+    route: "/pages/workshops/detail",
+    query: { id },
+  });
 
   const services = useMemo(
     () => (workshopQuery.data ? workshopQuery.data.services.map(mapServiceCatalogEntryToMobileService) : []),
@@ -141,6 +147,11 @@ function WorkshopDetailContent({ id }: { id?: string }) {
           返回工坊
         </Button>
         <Button className="tab-btn active">工坊详情</Button>
+        {mobileNativeShareEnabled ? (
+          <Button className="tab-btn" openType="share" data-testid="mobile-workshop-detail-share">
+            分享
+          </Button>
+        ) : null}
       </View>
 
       <View className="page-section">

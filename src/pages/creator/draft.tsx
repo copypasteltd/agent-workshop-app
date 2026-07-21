@@ -9,6 +9,7 @@ import Taro from "@tarojs/taro";
 import { useMobileQuery as useQuery } from "../../lib/useMobileQuery";
 import { useEffect, useMemo, useState } from "react";
 import { useMobilePageShellClass } from "../../components/MobilePageShell";
+import { useMobileShareDisabled } from "../../lib/mobileShare";
 import {
   mobileSessionCapturesApi,
   mobileSessionDraftsApi,
@@ -33,6 +34,7 @@ function createRuleId() {
 }
 
 export default function CreatorDraftPage() {
+  useMobileShareDisabled();
   const params = useMobileRouteParams<{ id?: string; projectId?: string }>();
   const pageShellClass = useMobilePageShellClass("creator-page-shell");
   if (!params) {

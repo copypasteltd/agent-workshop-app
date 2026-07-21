@@ -8,8 +8,10 @@ import { mapRunSnapshotToMobileTask } from "../../lib/liveTaskAdapters";
 import { useMobileWorkspaceCatalog } from "../../lib/useMobileWorkspaceCatalog";
 import { useResolvedMobileWorkspace } from "../../lib/useMobileWorkspace";
 import { useMobilePageShellClass } from "../../components/MobilePageShell";
+import { useMobileShareDisabled } from "../../lib/mobileShare";
 
 export default function TasksPage() {
+  useMobileShareDisabled();
   const pageShellClass = useMobilePageShellClass();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "running" | "approval" | "done" | "failed" | "cancelled" | "archived">("all");

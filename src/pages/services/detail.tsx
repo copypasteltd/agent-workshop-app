@@ -17,6 +17,7 @@ import { useResolvedMobileWorkspace } from "../../lib/useMobileWorkspace";
 import { useMobileRouteParams } from "../../lib/useMobileRouteParams";
 import { hasAuthoritativeMobileWorkspaceContext } from "../../lib/workspaceContext";
 import { useMobilePageShellClass } from "../../components/MobilePageShell";
+import { mobileNativeShareEnabled, useMobileShare } from "../../lib/mobileShare";
 
 function resolveMissingCredentialIds(error: unknown) {
   if (!(error instanceof ApiError) || error.code !== "CREDENTIAL_REQUIREMENT_UNMET") {
@@ -106,6 +107,11 @@ function ServiceDetailContent({ id }: { id?: string }) {
     () => (serviceQuery.data ? mapServiceCatalogEntryToMobileService(serviceQuery.data) : null),
     [serviceQuery.data]
   );
+  useMobileShare({
+    title: service ? `用灵办词元启动：${service.name}` : "灵办词元 Agent 工作流服务",
+    route: "/pages/services/detail",
+    query: { id },
+  });
   const providerProfileLookup = useMemo(
     () => new Map((providerProfilesQuery.data ?? []).map((provider) => [provider.providerId, provider])),
     [providerProfilesQuery.data]
@@ -388,6 +394,11 @@ function ServiceDetailContent({ id }: { id?: string }) {
             <Button className="pill" onClick={() => Taro.navigateBack()}>
               返回工坊
             </Button>
+            {mobileNativeShareEnabled ? (
+              <Button className="pill" openType="share" data-testid="mobile-service-detail-share">
+                分享服务
+              </Button>
+            ) : null}
             <Button
               className="pill active"
               data-testid="mobile-service-launch-button"

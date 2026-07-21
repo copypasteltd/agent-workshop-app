@@ -9,6 +9,7 @@ import Taro from "@tarojs/taro";
 import { useMobileQuery as useQuery } from "../../lib/useMobileQuery";
 import { useEffect, useMemo, useState } from "react";
 import { useMobilePageShellClass } from "../../components/MobilePageShell";
+import { useMobileShareDisabled } from "../../lib/mobileShare";
 import {
   mobileCatalogApi,
   mobileCreatorApi,
@@ -72,6 +73,7 @@ function gateTone(status: CreatorReleaseGate["status"]) {
 }
 
 export default function CreatorPublishPage() {
+  useMobileShareDisabled();
   const params = useMobileRouteParams<{ id?: string }>();
   const pageShellClass = useMobilePageShellClass("creator-page-shell");
   if (!params) {

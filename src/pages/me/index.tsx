@@ -13,6 +13,7 @@ import {
 } from "../../lib/api";
 import { mobileLogoSource } from "../../lib/mobileAssets";
 import { useMobilePageShellClass } from "../../components/MobilePageShell";
+import { useMobileShareDisabled } from "../../lib/mobileShare";
 import {
   billingCostBasisLabel,
   billingSourceLabel,
@@ -188,6 +189,7 @@ function buildMobileFavoriteRoute(target: {
 }
 
 export default function MePage() {
+  useMobileShareDisabled();
   const pageShellClass = useMobilePageShellClass();
   const queryClient = useQueryClient();
   const theme = useMobileUiStore((state) => state.theme);

@@ -3,6 +3,7 @@ import { Button, Image, Input, Switch, Textarea, View } from "@tarojs/components
 import Taro from "@tarojs/taro";
 import { useEffect, useMemo, useState } from "react";
 import { useMobilePageShellClass } from "../../components/MobilePageShell";
+import { useMobileShareDisabled } from "../../lib/mobileShare";
 import chevronDownIcon from "../../assets/chevron-down.svg";
 import {
   mobileCredentialsApi,
@@ -52,6 +53,7 @@ function toCapabilityError(error: unknown) {
 }
 
 export default function NewTaskPage() {
+  useMobileShareDisabled();
   const pageShellClass = useMobilePageShellClass("creator-page-shell");
   const queryClient = useQueryClient();
   const currentWorkspace = useResolvedMobileWorkspace();

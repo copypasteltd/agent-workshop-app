@@ -43,6 +43,7 @@ import { useMobileRunStream } from "../../lib/runStream";
 import { useResolvedMobileWorkspace } from "../../lib/useMobileWorkspace";
 import { useMobileRouteParams } from "../../lib/useMobileRouteParams";
 import { useMobilePageShellClass } from "../../components/MobilePageShell";
+import { useMobileShareDisabled } from "../../lib/mobileShare";
 import {
   useMobileUiStore,
   type MobileOutgoingMessageRecord,
@@ -432,6 +433,7 @@ function mapOutgoingMessageToDisplay(
 }
 
 export default function TaskDetailPage() {
+  useMobileShareDisabled();
   const params = useMobileRouteParams<{ id?: string }>();
   const pageShellClass = useMobilePageShellClass("task-detail-page");
   if (!params) {
