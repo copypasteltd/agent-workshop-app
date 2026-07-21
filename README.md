@@ -116,8 +116,11 @@ Standalone workspace exports expose the same commands from their generated root 
 - 本次任务的材料、参数与目标由 Codex 在完整对话中动态收集。
 - 任务详情顶部摘要支持折叠，主要视区持续承载对话。
 - 任务、文件与审批均使用真实 API 和实时事件流。
+- 对话流只渲染后端持久化消息；文件与审批分别使用对应 API 投影，不根据运行状态或文件名生成模拟消息。
 - Dashboard 创建的 Creator Source Run 会进入同一任务列表，并标记为 `Creator Source Session`，移动端可继续完整对话与查看文件。
 - 明暗主题同步页面背景、导航栏、TabBar 与系统色彩。
+
+Conversation history renders persisted backend messages only. Files and approvals use their dedicated API projections and never synthesize conversation entries from run status or filenames.
 - H5 与小程序统一以 375 设计宽度构建。
 - 登录态恢复完成前隐藏业务 TabBar，防止认证页和主导航叠加。
 
@@ -138,7 +141,7 @@ As of 2026-07-21, the H5 client covers the complete mobile workflow, including r
 | TypeScript | 通过 |
 | H5 production build | 通过 |
 | WeChat Mini Program production build | 通过 |
-| 最新微信交付产物 | `r2`，60 个文件，`1,223,977 Byte`，构建于 2026-07-21 |
+| 最新微信交付产物 | `r3`，60 个文件，`1,219,512 Byte`，SHA-256 `0FF96CF88DF32303BFF15C92234E1C6B5B222847620449D50119776492A06E0A` |
 | Public API health | `GET https://codex-miniapp.sidcloud.cn/health` 返回 `200` |
 | WeChat login API local smoke | 通过 |
 | Public WeChat login route | 已部署；无效 code 返回 `401 / AUTH_WECHAT_CODE_INVALID / 40029` |
@@ -153,7 +156,7 @@ As of 2026-07-21, the H5 client covers the complete mobile workflow, including r
 
 微信开发者工具可直接导入 `app/mobile/dist`。该目录的 `project.config.json` 使用 `miniprogramRoot: "./"`，AppID 为 `wx4b21e9b9200dcf9b`，基础库固定为 `3.15.2`。
 
-最新发布快照保留独立目录 `release/mini-program/lingban-weapp-20260721-r2` 和压缩包 `release/mini-program/lingban-weapp-20260721-r2.zip`。压缩包解压后可直接作为微信开发者工具项目导入。
+最新发布快照保留独立目录 `release/mini-program/lingban-weapp-20260721-r3` 和压缩包 `release/mini-program/lingban-weapp-20260721-r3.zip`。压缩包解压后可直接作为微信开发者工具项目导入，服务器下载地址为 `http://192.168.31.20:38120/downloads/lingban-weapp-20260721-r3.zip`。
 
 WeChat Developer Tools can import `app/mobile/dist` directly. The release snapshot also contains a standalone directory and ZIP package whose root includes `app.js`, `app.json`, `app.wxss`, and `project.config.json`.
 

@@ -97,96 +97,6 @@ function collectPathOptions(targetPath: string, files: RunFileEntry[]) {
   }));
 }
 
-function buildModuleMessages(
-  snapshot: RunSnapshot,
-  files: RunFileEntry[],
-  status: ReturnType<typeof statusMeta>
-): MobileTaskMessage[] {
-  const nextMessages: MobileTaskMessage[] = [];
-  const pendingApprovals = snapshot.approvals.filter((item) => item.state === "pending");
-  const visibleFiles = files.filter((file) => !file.path.endsWith("/"));
-
-  if (pendingApprovals.length > 0) {
-    nextMessages.push({
-      role: "系统引导",
-      time: formatClock(snapshot.run.updatedAt),
-      body: "当前实例有待确认动作，请直接在这条消息流里处理。",
-      kind: "system",
-      module: {
-        type: "approval",
-        title: "当前实例等待确认",
-        summary: "敏感动作和预算相关动作会直接回到当前任务对话，不会脱离同一实例上下文。",
-        status: "待确认",
-        items: pendingApprovals
-          .slice(0, 3)
-          .map((item) => item.note?.trim() || item.prompt.trim()),
-        primaryAction: "继续执行",
-        primaryDraft: "我已确认当前待审批动作，请继续执行这一轮实例。",
-        secondaryAction: "先解释原因",
-        secondaryDraft: "请先解释当前审批动作为什么需要我确认，再决定是否继续执行。",
-      },
-    });
-  }
-
-  if (visibleFiles.length > 0) {
-    const topFiles = visibleFiles.slice(0, 3).map((file) => toRelativeFileName(file.path, snapshot.run.targetPath));
-    nextMessages.push({
-      role: "运行实例",
-      time: formatClock(snapshot.run.updatedAt),
-      body:
-        snapshot.run.status === "SUCCEEDED"
-          ? "结果文件已经整理完成，可直接打开文件页查看或继续追问。"
-          : "当前已有中间结果文件，可直接打开文件页继续检查。",
-      kind: "agent",
-      module: {
-        type: snapshot.run.status === "FAILED" ? "error" : snapshot.run.status === "SUCCEEDED" ? "result" : "file",
-        title:
-          snapshot.run.status === "FAILED"
-            ? "实例输出包含错误线索"
-            : snapshot.run.status === "SUCCEEDED"
-              ? "结果文件已生成"
-              : "已有可查看文件",
-        summary:
-          snapshot.run.status === "FAILED"
-            ? "先查看当前目录下的错误摘要和中间结果，再决定是否继续重试。"
-            : snapshot.run.status === "SUCCEEDED"
-              ? "结果包和关键摘要已经写回任务目录，可继续下载或在对话中派生下一轮动作。"
-              : "当前实例已经把中间结果写到任务目录，你可以直接打开文件页检查。",
-        status: status.label,
-        items: topFiles,
-        primaryAction: "查看文件",
-        secondaryAction: "继续追问",
-        secondaryDraft:
-          snapshot.run.status === "FAILED"
-            ? "请结合当前错误输出解释失败原因，并告诉我恢复执行需要我补充什么。"
-            : "请基于当前结果继续概括关键信息，并告诉我下一步最值得处理的动作。",
-      },
-    });
-  }
-
-  if (snapshot.run.status === "FAILED") {
-    nextMessages.push({
-      role: "系统引导",
-      time: formatClock(snapshot.run.updatedAt),
-      body: "当前实例进入错误处理阶段，请先确认恢复路径。",
-      kind: "system",
-      module: {
-        type: "error",
-        title: "实例需要恢复建议",
-        summary: "失败状态不会自动重置上下文，建议先让 Codex 解释原因，再决定是否继续重试。",
-        status: "错误处理",
-        items: ["保留当前会话上下文", "先读取错误摘要", "确认是否重新执行上一阶段"],
-        primaryAction: "解释失败原因",
-        primaryDraft: "请先解释当前实例失败原因，并给出最稳妥的恢复执行建议。",
-        secondaryAction: "继续重试",
-        secondaryDraft: "请基于当前上下文继续重试上一阶段，并告诉我是否还需要新的输入。",
-      },
-    });
-  }
-
-  return nextMessages;
-}
-
 function runtimeLaunchModeLabel(value: RunSnapshot["runtime"]["launchMode"]) {
   switch (value) {
     case "local-process":
@@ -245,7 +155,6 @@ export function mapRunSnapshotToMobileTask(
       | "user"
       | "agent",
   }));
-  messages.push(...buildModuleMessages(snapshot, files, status));
   const lastMessage = messages[messages.length - 1];
 
   return {
