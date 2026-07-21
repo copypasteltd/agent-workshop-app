@@ -94,6 +94,46 @@ button::after {
   font-weight: 600;
 }
 
+.task-detail-page .lifecycle-menu-btn .inline-action-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.task-detail-page .lifecycle-banner {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 11px 12px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent);
+  border-radius: 8px;
+  background: var(--task-panel);
+}
+
+.task-detail-page .lifecycle-banner.warn {
+  border-left-color: var(--warn);
+}
+
+.task-detail-page .lifecycle-banner.success {
+  border-left-color: var(--success);
+}
+
+.task-detail-page .lifecycle-banner-title {
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.task-detail-page .lifecycle-banner-copy {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
 .task-detail-page .inline-action-icon,
 .task-detail-page .capture-sheet-icon {
   filter: invert(72%);
@@ -392,6 +432,33 @@ body[data-theme="light"] .task-detail-page .capture-sheet-icon {
   overflow: hidden;
   padding: 8px 10px;
   gap: 0;
+}
+
+.task-detail-page .lifecycle-composer {
+  min-height: 68px;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  overflow: hidden;
+}
+
+.task-detail-page .task-composer-preview.terminal {
+  max-width: 245px;
+  white-space: normal;
+}
+
+.task-detail-page .lifecycle-composer-actions {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.task-detail-page .lifecycle-composer-actions taro-button-core {
+  min-height: 32px;
+  padding: 0 10px;
+  font-size: 10px;
 }
 
 .task-detail-page .task-composer-toggle {

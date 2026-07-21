@@ -2,6 +2,7 @@ import { useMobileQuery as useQuery } from "../../lib/useMobileQuery";
 import { Button, Input, View } from "@tarojs/components";
 import Taro from "@tarojs/taro";
 import { useMemo, useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { mobileRunsApi } from "../../lib/api";
 import { mapRunSnapshotToMobileTask } from "../../lib/liveTaskAdapters";
 import { useMobileWorkspaceCatalog } from "../../lib/useMobileWorkspaceCatalog";
@@ -11,9 +12,10 @@ import { useMobilePageShellClass } from "../../components/MobilePageShell";
 export default function TasksPage() {
   const pageShellClass = useMobilePageShellClass();
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"all" | "running" | "approval" | "done">("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | "running" | "approval" | "done" | "failed" | "cancelled" | "archived">("all");
   const [tagFilter, setTagFilter] = useState("all");
   const currentWorkspace = useResolvedMobileWorkspace();
+  const queryClient = useQueryClient();
   const { availableTaskTags, combinedTasks, taskDataMode, workspaceDataReady } =
     useMobileWorkspaceCatalog(currentWorkspace);
 
@@ -33,13 +35,20 @@ export default function TasksPage() {
         return await mobileRunsApi.listRuns({
           q: searchQuery.trim() || undefined,
           attentionMode:
-            statusFilter === "all"
+            statusFilter === "all" || statusFilter === "failed" || statusFilter === "cancelled" || statusFilter === "archived"
               ? undefined
               : statusFilter === "running"
                 ? "running"
                 : statusFilter === "approval"
                   ? "todo"
                   : "done",
+          viewStatus:
+            statusFilter === "failed"
+              ? "failed"
+              : statusFilter === "cancelled"
+                ? "cancelled"
+                : undefined,
+          recordStatus: statusFilter === "archived" ? "ARCHIVED" : undefined,
           tag: tagFilter === "all" ? undefined : tagFilter,
         });
       } catch {
@@ -77,12 +86,71 @@ export default function TasksPage() {
     filteredRunsQuery.isSuccess,
     taskDataMode,
   ]);
+  const runSnapshotsById = useMemo(
+    () => new Map((filteredRunsQuery.data ?? []).map((snapshot) => [snapshot.run.runId, snapshot])),
+    [filteredRunsQuery.data]
+  );
+  const lifecycleMutation = useMutation({
+    mutationFn: async (input: { runId: string; action: "stop" | "archive" | "restore" | "delete" }) => {
+      switch (input.action) {
+        case "stop":
+          return await mobileRunsApi.stopRun(input.runId, "用户从移动端任务列表结束实例");
+        case "archive":
+          return await mobileRunsApi.archiveRun(input.runId, "用户从移动端任务列表归档实例");
+        case "restore":
+          return await mobileRunsApi.restoreRun(input.runId);
+        case "delete":
+          return await mobileRunsApi.deleteRun(input.runId, "用户确认从移动端永久删除实例");
+      }
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["mobile", "runs"] });
+      Taro.showToast({ title: "实例状态已更新", icon: "success" });
+    },
+    onError: (error) => Taro.showToast({ title: error instanceof Error ? error.message : "实例操作失败", icon: "none" }),
+  });
+  const confirmListAction = async (runId: string, action: "stop" | "delete") => {
+    const result = await Taro.showModal({
+      title: action === "stop" ? "立即停止实例" : "永久删除实例",
+      content: action === "stop"
+        ? "当前执行将被中断，运行环境完成释放后仍可查看消息和结果。"
+        : `实例 ${runId} 的消息、文件与运行记录将被清理，该操作无法撤销。`,
+      confirmText: action === "stop" ? "停止并释放" : "永久删除",
+      confirmColor: "#d84b4b",
+    });
+    if (result.confirm) lifecycleMutation.mutate({ runId, action });
+  };
+  const openTaskLifecycleMenu = async (runId: string) => {
+    const snapshot = runSnapshotsById.get(runId);
+    if (!snapshot) return;
+    const items: Array<{ label: string; execute: () => void | Promise<void> }> = [
+      { label: "打开实例", execute: () => { void Taro.navigateTo({ url: `/pages/tasks/detail?id=${runId}` }); } },
+    ];
+    if (snapshot.lifecycle.recordStatus === "ARCHIVED") {
+      items.push({ label: "恢复到任务列表", execute: () => lifecycleMutation.mutate({ runId, action: "restore" }) });
+      items.push({ label: "永久删除", execute: () => confirmListAction(runId, "delete") });
+    } else if (["SUCCEEDED", "FAILED", "CANCELLED"].includes(snapshot.run.status) && snapshot.lifecycle.runtimeStatus === "RELEASED") {
+      items.push({ label: "归档实例", execute: () => lifecycleMutation.mutate({ runId, action: "archive" }) });
+      items.push({ label: "永久删除", execute: () => confirmListAction(runId, "delete") });
+    } else {
+      items.push({ label: "立即停止并释放", execute: () => confirmListAction(runId, "stop") });
+    }
+    try {
+      const result = await Taro.showActionSheet({ itemList: items.map((item) => item.label) });
+      await items[result.tapIndex]?.execute();
+    } catch {
+      // The user dismissed the action sheet.
+    }
+  };
 
   const statusOptions = [
     { key: "all" as const, label: "全部" },
     { key: "running" as const, label: "运行中" },
     { key: "approval" as const, label: "待审批" },
     { key: "done" as const, label: "已完成" },
+    { key: "failed" as const, label: "失败" },
+    { key: "cancelled" as const, label: "已取消" },
+    { key: "archived" as const, label: "已归档" },
   ];
 
   const listSummary =
@@ -221,13 +289,22 @@ export default function TasksPage() {
               </View>
               <View className="card-row">
                 <View className="muted">进入任务完整对话</View>
-                <Button
-                  className="pill active"
-                  data-testid={`mobile-task-open-${item.id}`}
-                  onClick={() => Taro.navigateTo({ url: `/pages/tasks/detail?id=${item.id}` })}
-                >
-                  打开
-                </Button>
+                <View className="pill-row">
+                  <Button
+                    className="pill"
+                    disabled={lifecycleMutation.isPending}
+                    onClick={() => openTaskLifecycleMenu(item.id)}
+                  >
+                    管理
+                  </Button>
+                  <Button
+                    className="pill active"
+                    data-testid={`mobile-task-open-${item.id}`}
+                    onClick={() => Taro.navigateTo({ url: `/pages/tasks/detail?id=${item.id}` })}
+                  >
+                    打开
+                  </Button>
+                </View>
               </View>
             </View>
           ))}

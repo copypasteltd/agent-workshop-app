@@ -41,27 +41,33 @@ function statusMeta(status: RunStatus) {
       return {
         status: "done" as const,
         label: "已完成",
-        className: "active",
+        className: "success",
         stage: "结果完成",
       };
     case "FAILED":
       return {
-        status: "approval" as const,
+        status: "failed" as const,
         label: "失败",
         className: "warn",
         stage: "错误处理",
+      };
+    case "CANCELLED":
+      return {
+        status: "cancelled" as const,
+        label: "已取消",
+        className: "warn",
+        stage: "任务终止",
       };
     case "CREATED":
     case "READY":
     case "QUEUED":
     case "STARTING":
     case "RUNNING":
-    case "CANCELLED":
     default:
       return {
         status: "running" as const,
-        label: status === "CANCELLED" ? "已取消" : "运行中",
-        className: status === "CANCELLED" ? "warn" : "success",
+        label: "运行中",
+        className: "success",
         stage:
           status === "READY"
             ? "已就绪"
@@ -69,9 +75,7 @@ function statusMeta(status: RunStatus) {
               ? "排队中"
               : status === "STARTING"
                 ? "启动中"
-                : status === "CANCELLED"
-                  ? "任务终止"
-                  : "对话推进",
+                : "对话推进",
       };
   }
 }

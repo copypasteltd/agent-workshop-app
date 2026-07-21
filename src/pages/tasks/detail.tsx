@@ -25,6 +25,7 @@ import {
 import { mobileBillingApi, mobileQuotaApi, mobileRunsApi, mobileSessionCapturesApi } from "../../lib/api";
 import archiveIcon from "../../assets/archive.svg";
 import chevronDownIcon from "../../assets/chevron-down.svg";
+import moreHorizontalIcon from "../../assets/more-horizontal.svg";
 import { isLiveTaskId, mapRunSnapshotToMobileTask } from "../../lib/liveTaskAdapters";
 import {
   formatQuotaValue,
@@ -730,6 +731,13 @@ function TaskDetailContent({ id }: { id?: string }) {
   const hasInFlightOutgoing = outgoingMessages.some((item) => item.status !== "failed");
 
   const liveMode = Boolean(task);
+  const runTerminal = Boolean(
+    liveSnapshot && ["SUCCEEDED", "FAILED", "CANCELLED"].includes(liveSnapshot.run.status)
+  );
+  const runtimeTransitioning = Boolean(
+    liveSnapshot && ["STOP_REQUESTED", "STOPPING"].includes(liveSnapshot.lifecycle.runtimeStatus)
+  );
+  const runInteractive = Boolean(liveSnapshot && !runTerminal && !runtimeTransitioning);
   const activeCapture =
     capturesQuery.data?.find((capture) => capture.captureId === submittedCaptureId) ??
     capturesQuery.data?.find((capture) => !["CAPTURED", "FAILED", "CANCELLED"].includes(capture.status)) ??
@@ -778,6 +786,101 @@ function TaskDetailContent({ id }: { id?: string }) {
       Taro.showToast({ title: error instanceof Error ? error.message : "固化提交失败", icon: "none" });
     },
   });
+  const refreshLifecycleQueries = async (runId: string) => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["mobile", "runs"] }),
+      queryClient.invalidateQueries({ queryKey: mobileRunDetailQueryKey(runId) }),
+      queryClient.invalidateQueries({ queryKey: mobileRunFilesQueryKey(runId) }),
+      queryClient.invalidateQueries({ queryKey: ["mobile", "billing"] }),
+    ]);
+  };
+  const stopMutation = useMutation({
+    mutationFn: async (runId: string) =>
+      mobileRunsApi.stopRun(runId, "用户从移动端结束当前实例"),
+    onSuccess: async (snapshot) => {
+      queryClient.setQueryData(mobileRunDetailQueryKey(snapshot.run.runId), snapshot);
+      setComposerExpanded(false);
+      await refreshLifecycleQueries(snapshot.run.runId);
+      Taro.showToast({
+        title: snapshot.lifecycle.runtimeStatus === "RELEASED" ? "运行环境已释放" : "停止请求已提交",
+        icon: "success",
+      });
+    },
+    onError: (error) => {
+      Taro.showToast({ title: error instanceof Error ? error.message : "停止实例失败", icon: "none" });
+    },
+  });
+  const archiveMutation = useMutation({
+    mutationFn: async (runId: string) => mobileRunsApi.archiveRun(runId, "用户从移动端归档实例"),
+    onSuccess: async (snapshot) => {
+      queryClient.setQueryData(mobileRunDetailQueryKey(snapshot.run.runId), snapshot);
+      await refreshLifecycleQueries(snapshot.run.runId);
+      Taro.showToast({ title: "实例已归档", icon: "success" });
+    },
+    onError: (error) => Taro.showToast({ title: error instanceof Error ? error.message : "归档失败", icon: "none" }),
+  });
+  const restoreMutation = useMutation({
+    mutationFn: async (runId: string) => mobileRunsApi.restoreRun(runId),
+    onSuccess: async (snapshot) => {
+      queryClient.setQueryData(mobileRunDetailQueryKey(snapshot.run.runId), snapshot);
+      await refreshLifecycleQueries(snapshot.run.runId);
+      Taro.showToast({ title: "实例已恢复", icon: "success" });
+    },
+    onError: (error) => Taro.showToast({ title: error instanceof Error ? error.message : "恢复失败", icon: "none" }),
+  });
+  const deleteMutation = useMutation({
+    mutationFn: async (runId: string) => mobileRunsApi.deleteRun(runId, "用户确认永久删除当前实例"),
+    onSuccess: async (_, runId) => {
+      await queryClient.invalidateQueries({ queryKey: ["mobile", "runs"] });
+      queryClient.removeQueries({ queryKey: mobileRunDetailQueryKey(runId) });
+      Taro.showToast({ title: "实例已删除", icon: "success" });
+      setTimeout(() => Taro.navigateBack(), 400);
+    },
+    onError: (error) => Taro.showToast({ title: error instanceof Error ? error.message : "删除失败", icon: "none" }),
+  });
+  const confirmStop = async () => {
+    if (!task) return;
+    const result = await Taro.showModal({
+      title: "立即停止实例",
+      content: "当前执行将被中断，已写入工作目录的文件会保留。运行环境释放后仍可查看消息和结果。",
+      confirmText: "停止并释放",
+      confirmColor: "#d84b4b",
+    });
+    if (result.confirm) stopMutation.mutate(task.id);
+  };
+  const confirmDelete = async () => {
+    if (!task) return;
+    const result = await Taro.showModal({
+      title: "永久删除实例",
+      content: `将清理实例 ${task.runRef} 的消息、工作目录和运行记录。该操作无法撤销。`,
+      confirmText: "永久删除",
+      confirmColor: "#d84b4b",
+    });
+    if (result.confirm) deleteMutation.mutate(task.id);
+  };
+  const openLifecycleActions = async () => {
+    if (!task || !liveSnapshot) return;
+    const actions: Array<{ label: string; run: () => void | Promise<void> }> = [];
+    if (liveSnapshot.lifecycle.recordStatus === "ARCHIVED") {
+      actions.push({ label: "恢复到任务列表", run: () => restoreMutation.mutate(task.id) });
+      actions.push({ label: "永久删除实例", run: confirmDelete });
+    } else if (runInteractive) {
+      actions.push({ label: "固化并结束", run: () => setCaptureSheetOpen(true) });
+      actions.push({ label: "立即停止并释放", run: confirmStop });
+    } else if (liveSnapshot.lifecycle.runtimeStatus === "RELEASE_FAILED" || liveSnapshot.lifecycle.runtimeStatus === "ORPHANED") {
+      actions.push({ label: "重试释放运行环境", run: confirmStop });
+    } else if (liveSnapshot.lifecycle.runtimeStatus === "RELEASED") {
+      actions.push({ label: "归档实例", run: () => archiveMutation.mutate(task.id) });
+      actions.push({ label: "永久删除实例", run: confirmDelete });
+    }
+    if (actions.length === 0) return;
+    try {
+      const result = await Taro.showActionSheet({ itemList: actions.map((item) => item.label) });
+      await actions[result.tapIndex]?.run();
+    } catch {
+      // The user dismissed the action sheet.
+    }
+  };
   useMobileRecentRecorder(
     task && liveMode && currentWorkspace.source === "auth"
       ? {
@@ -1325,12 +1428,51 @@ function TaskDetailContent({ id }: { id?: string }) {
         <Button
           className="tab-btn capture-tab-btn"
           data-testid="mobile-task-capture-session"
+          disabled={!runInteractive}
           onClick={() => setCaptureSheetOpen(true)}
         >
           <Image className="inline-action-icon" src={archiveIcon} mode="aspectFit" />
           固化
         </Button>
+        <Button
+          className="tab-btn lifecycle-menu-btn"
+          data-testid="mobile-task-lifecycle-menu"
+          disabled={stopMutation.isPending || archiveMutation.isPending || restoreMutation.isPending || deleteMutation.isPending}
+          onClick={openLifecycleActions}
+        >
+          <Image className="inline-action-icon" src={moreHorizontalIcon} mode="aspectFit" />
+          管理
+        </Button>
       </View>
+
+      {liveSnapshot && liveSnapshot.lifecycle.runtimeStatus !== "ACTIVE" && liveSnapshot.lifecycle.runtimeStatus !== "NOT_STARTED" ? (
+        <View
+          className={`lifecycle-banner ${liveSnapshot.lifecycle.deletionFailure || ["RELEASE_FAILED", "ORPHANED"].includes(liveSnapshot.lifecycle.runtimeStatus) ? "warn" : liveSnapshot.lifecycle.runtimeStatus === "RELEASED" ? "success" : "active"}`}
+          data-testid="mobile-task-lifecycle-status"
+        >
+          <View>
+            <View className="lifecycle-banner-title">
+              {liveSnapshot.lifecycle.deletionFailure
+                ? "实例销毁未完成"
+                : liveSnapshot.lifecycle.runtimeStatus === "RELEASED"
+                ? "运行环境已释放"
+                : ["RELEASE_FAILED", "ORPHANED"].includes(liveSnapshot.lifecycle.runtimeStatus)
+                  ? "运行环境释放失败"
+                  : "正在停止并释放运行环境"}
+            </View>
+            <View className="lifecycle-banner-copy">
+              {liveSnapshot.lifecycle.deletionFailure
+                ? liveSnapshot.lifecycle.deletionFailure
+                : liveSnapshot.lifecycle.releaseFailure
+                ? liveSnapshot.lifecycle.releaseFailure
+                : liveSnapshot.lifecycle.runtimeStatus === "RELEASED"
+                  ? "当前实例不再占用运行资源，消息和结果文件继续保留。"
+                  : "停止期间已锁定消息发送和审批操作。"}
+            </View>
+          </View>
+          <View className="pill">{liveSnapshot.lifecycle.runtimeStatus}</View>
+        </View>
+      ) : null}
 
       <View className={`task-shell ${summaryOpen ? "is-open" : ""}`}>
         <Button
@@ -2023,10 +2165,11 @@ function TaskDetailContent({ id }: { id?: string }) {
         ))}
       </View>
 
-      <View
-        className={`composer task-composer ${composerExpanded ? "expanded" : "collapsed"}`}
-        data-testid="mobile-task-composer"
-      >
+      {runInteractive ? (
+        <View
+          className={`composer task-composer ${composerExpanded ? "expanded" : "collapsed"}`}
+          data-testid="mobile-task-composer"
+        >
         <Button
           className="task-composer-toggle"
           data-testid="mobile-task-composer-toggle"
@@ -2185,7 +2328,29 @@ function TaskDetailContent({ id }: { id?: string }) {
             </View>
           </>
         ) : null}
-      </View>
+        </View>
+      ) : (
+        <View className="composer task-composer lifecycle-composer" data-testid="mobile-task-terminal-actions">
+          <View>
+            <View className="task-composer-title">
+              {runtimeTransitioning
+                ? "正在停止实例"
+                : liveSnapshot && ["RELEASE_FAILED", "ORPHANED"].includes(liveSnapshot.lifecycle.runtimeStatus)
+                  ? "运行环境释放失败"
+                  : "实例已结束"}
+            </View>
+            <View className="task-composer-preview terminal">
+              {runtimeTransitioning
+                ? "完成释放后可继续查看文件和归档实例"
+                : "当前会话已锁定，可查看结果、归档或删除"}
+            </View>
+          </View>
+          <View className="lifecycle-composer-actions">
+            <Button className="pill" onClick={() => Taro.navigateTo({ url: `/pages/tasks/files?id=${task.id}` })}>查看文件</Button>
+            <Button className="pill active" onClick={openLifecycleActions}>管理实例</Button>
+          </View>
+        </View>
+      )}
 
       {captureSheetOpen ? (
         <View className="capture-sheet-layer">

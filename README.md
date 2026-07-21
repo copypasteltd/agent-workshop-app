@@ -25,12 +25,14 @@ This component consumes internal `workspace:*` packages. Development in the sour
 3. 系统在首条用户消息前引导 Codex 询问本次执行所需信息。
 4. 用户在任务详情中持续对话、上传材料、处理审批并查看进度。
 5. 用户在任务文件页浏览 target path、切换路径、预览或下载产物。
+6. 用户可停止并释放运行实例，随后归档、恢复归档或永久销毁实例记录。
 
 1. Discover a reusable workflow in the Workshop catalog.
 2. Bind account-level providers, MCP connections, and credentials, then instantiate the service.
 3. Let Codex request run-specific information before the first user message.
 4. Continue the full conversation, upload inputs, handle approvals, and monitor progress.
 5. Browse the target path and preview or download generated artifacts.
+6. Stop and release a run, then archive, restore, or permanently delete its record.
 
 ## 页面结构 / Page Map
 
@@ -47,6 +49,17 @@ This component consumes internal `workspace:*` packages. Development in the sour
 底部导航固定为 `工坊 / 任务 / 我的`。文件能力归属于具体任务详情，避免增加独立文件 Tab。
 
 The bottom navigation is fixed to `Workshop / Tasks / Me`. File access remains scoped to an individual task.
+
+## 实例生命周期 / Run Lifecycle
+
+- 任务列表和任务详情均提供“管理”入口。
+- 活动实例支持停止并释放；停止期间禁用消息、附件和审批。
+- 终态实例显示 Runtime 释放状态，并可继续查看消息与文件。
+- 已释放实例支持归档、恢复和永久删除；销毁失败会显示诊断并允许重试。
+- 未完成的 Session Capture 会阻止永久删除，避免固化资产损坏。
+- 输入区保持可折叠，终态时替换为生命周期操作区。
+
+Task list and conversation detail surfaces expose the same lifecycle operations. Capture gates protect reusable Session evidence, and terminal runs remain readable after runtime release.
 
 ## 工程结构 / Code Structure
 
@@ -131,7 +144,7 @@ As of 2026-07-19, the H5 client covers the complete mobile workflow. The WeChat 
 | Current AppID account type | `gameApp=false / appType=0 / compileType=weapp` |
 | WeChat Developer Tools Preview | 通过，产物 `1,105,719 Byte` |
 | Real WeChat login | 两次 `wx.login` code 均成功换取会话，并复用用户 `usr_00000012` 与工作区 `wsp_00000012` |
-| Playwright Dashboard/Admin/H5 E2E | 32/32 通过 |
+| Playwright Dashboard/Admin/H5 E2E | 33/33 通过 |
 | Mobile 页面状态视觉检查 | 14/14 通过 |
 | 当前验收地址 | `http://192.168.31.20:38120/` |
 

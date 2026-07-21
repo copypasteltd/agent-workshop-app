@@ -3,7 +3,7 @@ export type MobileTask = {
   workspaceId?: string;
   title: string;
   workshop: string;
-  status: "running" | "approval" | "done";
+  status: "running" | "approval" | "done" | "failed" | "cancelled";
   statusLabel: string;
   statusClass: string;
   updatedAt: string;
