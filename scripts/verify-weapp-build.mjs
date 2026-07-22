@@ -110,6 +110,10 @@ for (const marker of [
   "composer-collapsed",
   "composer-expanded",
   "task-composer-chevron",
+  "mobile-message-image-",
+  "message-image-card",
+  "previewRunFile",
+  "previewImage",
 ]) {
   if (!taskDetailPageSource.includes(marker)) {
     throw new Error(`Missing collapsible task composer marker: ${marker}`);

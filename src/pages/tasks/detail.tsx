@@ -43,6 +43,8 @@ import { useMobileRunStream } from "../../lib/runStream";
 import { useResolvedMobileWorkspace } from "../../lib/useMobileWorkspace";
 import { useMobileRouteParams } from "../../lib/useMobileRouteParams";
 import { useMobilePageShellClass } from "../../components/MobilePageShell";
+import { MobileMessageContent } from "../../components/MobileMessageContent";
+import { isAgentImageAttachment } from "../../lib/agentMessageImages";
 import { useMobileShareDisabled } from "../../lib/mobileShare";
 import {
   useMobileUiStore,
@@ -2067,7 +2069,17 @@ function TaskDetailContent({ id }: { id?: string }) {
                 </View>
                 <View className="time">{message.time}</View>
               </View>
-              <View className="message-body">{message.body}</View>
+              <MobileMessageContent
+                runId={task.id}
+                targetPath={task.targetPath}
+                text={message.body}
+                attachments={message.attachments}
+                onOpenFile={(filePath) =>
+                  Taro.navigateTo({
+                    url: `/pages/tasks/files?id=${encodeURIComponent(task.id)}&path=${encodeURIComponent(filePath)}`,
+                  })
+                }
+              />
               {message.deliveryStatus ? (
                 <View className="message-status-row">
                   <View className={`pill ${deliveryStatusTone(message.deliveryStatus)}`}>
@@ -2078,14 +2090,20 @@ function TaskDetailContent({ id }: { id?: string }) {
                   ) : null}
                 </View>
               ) : null}
-              {message.attachments?.length ? (
+              {message.attachments?.some(
+                (attachment) => !isAgentImageAttachment(attachment.path, task.targetPath)
+              ) ? (
                 <View className="message-attachment-list">
-                  {message.attachments.map((attachment) => (
-                    <View className="message-attachment-chip" key={`${attachment.path}-${attachment.label}`}>
-                      <View className="message-attachment-label">{attachment.label}</View>
-                      <View className="message-attachment-meta mono">{attachment.path}</View>
-                    </View>
-                  ))}
+                  {message.attachments
+                    .filter(
+                      (attachment) => !isAgentImageAttachment(attachment.path, task.targetPath)
+                    )
+                    .map((attachment) => (
+                      <View className="message-attachment-chip" key={`${attachment.path}-${attachment.label}`}>
+                        <View className="message-attachment-label">{attachment.label}</View>
+                        <View className="message-attachment-meta mono">{attachment.path}</View>
+                      </View>
+                    ))}
                 </View>
               ) : null}
             </View>

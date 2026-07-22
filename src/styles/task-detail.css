@@ -323,6 +323,93 @@ body[data-theme="light"] .task-detail-page .capture-sheet-icon {
   white-space: pre-wrap;
 }
 
+.task-detail-page .message-image-list {
+  display: grid;
+  gap: 8px;
+}
+
+.task-detail-page .message-image-card {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--task-divider);
+  border-radius: 6px;
+  background: var(--task-panel-raised);
+}
+
+.task-detail-page .message-image-head {
+  display: grid;
+  gap: 2px;
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--task-divider);
+}
+
+.task-detail-page .message-image-label {
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.task-detail-page .message-image-path {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.task-detail-page .message-image-frame {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--task-panel) 88%, #000);
+}
+
+.task-detail-page .message-image-preview {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.task-detail-page .message-image-state {
+  min-height: 132px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  padding: 16px;
+  background: var(--task-panel);
+}
+
+.task-detail-page .message-image-state-mark {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 8px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+
+.task-detail-page .message-image-state-mark.loading {
+  background: #6683f4;
+  box-shadow: 0 0 0 4px color-mix(in srgb, #6683f4 14%, transparent);
+}
+
+.task-detail-page .message-image-state-copy {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.task-detail-page .message-image-actions {
+  display: flex;
+  gap: 7px;
+  padding: 8px 10px 10px;
+  border-top: 1px solid var(--task-divider);
+}
+
 .task-detail-page .message-module {
   padding: 12px;
   gap: 10px;

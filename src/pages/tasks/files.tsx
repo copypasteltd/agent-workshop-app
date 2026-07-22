@@ -17,6 +17,7 @@ import { useResolvedMobileWorkspace } from "../../lib/useMobileWorkspace";
 import { useMobileRouteParams } from "../../lib/useMobileRouteParams";
 import { useMobilePageShellClass } from "../../components/MobilePageShell";
 import { useMobileShareDisabled } from "../../lib/mobileShare";
+import { normalizeAgentImagePath } from "../../lib/agentMessageImages";
 
 function ensureTrailingSlash(value: string) {
   return value.endsWith("/") ? value : `${value}/`;
@@ -116,15 +117,15 @@ function toTestIdSegment(value: string) {
 
 export default function TaskFilesPage() {
   useMobileShareDisabled();
-  const params = useMobileRouteParams<{ id?: string }>();
+  const params = useMobileRouteParams<{ id?: string; path?: string }>();
   const pageShellClass = useMobilePageShellClass();
   if (!params) {
     return <View className={pageShellClass}><View className="section-copy">正在加载文件路由</View></View>;
   }
-  return <TaskFilesContent id={params.id} />;
+  return <TaskFilesContent id={params.id} initialFilePath={params.path} />;
 }
 
-function TaskFilesContent({ id }: { id?: string }) {
+function TaskFilesContent({ id, initialFilePath }: { id?: string; initialFilePath?: string }) {
   const pageShellClass = useMobilePageShellClass();
   const liveTaskId = isLiveTaskId(id);
   const currentWorkspace = useResolvedMobileWorkspace();
@@ -263,9 +264,19 @@ function TaskFilesContent({ id }: { id?: string }) {
     const nextPath = pathOptions[0]?.path ?? task.targetPath;
     setCurrentPath(nextPath);
     setInputPath(nextPath);
-    setSelectedFilePath(fileItems[0]?.path ?? "");
+    const requestedRelativePath = initialFilePath
+      ? normalizeAgentImagePath(initialFilePath, task.targetPath)
+      : null;
+    const requestedAbsolutePath = requestedRelativePath
+      ? `${ensureTrailingSlash(task.targetPath)}${requestedRelativePath}`
+      : null;
+    setSelectedFilePath(
+      fileItems.find(
+        (item) => item.path === initialFilePath || item.path === requestedAbsolutePath
+      )?.path ?? fileItems[0]?.path ?? ""
+    );
     setFileSearch("");
-  }, [fileItems, pathOptions, task]);
+  }, [fileItems, initialFilePath, pathOptions, task]);
 
   const visibleFiles = useMemo(() => {
     if (!task) {

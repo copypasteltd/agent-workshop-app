@@ -141,7 +141,7 @@ As of 2026-07-21, the H5 client covers the complete mobile workflow, including r
 | TypeScript | 通过 |
 | H5 production build | 通过 |
 | WeChat Mini Program production build | 通过 |
-| 最新微信交付产物 | `r4`，60 个文件，`1,223,518 Byte`，SHA-256 `FB46E12C4A1497710D0EA56FAD665785F4277FF7CFFACDC9D67D61B6916481D2` |
+| 最新微信交付产物 | `r5`，60 个文件，`1,231,084 Byte`，SHA-256 `70E22AFAEE8A9118AD733AD784F0ED7EF21B5EB669D997E18801F9380CCF465E` |
 | Public API health | `GET https://codex-miniapp.sidcloud.cn/health` 返回 `200` |
 | WeChat login API local smoke | 通过 |
 | Public WeChat login route | 已部署；无效 code 返回 `401 / AUTH_WECHAT_CODE_INVALID / 40029` |
@@ -156,7 +156,7 @@ As of 2026-07-21, the H5 client covers the complete mobile workflow, including r
 
 微信开发者工具可直接导入 `app/mobile/dist`。该目录的 `project.config.json` 使用 `miniprogramRoot: "./"`，AppID 为 `wx4b21e9b9200dcf9b`，基础库固定为 `3.15.2`。
 
-最新发布快照保留独立目录 `release/mini-program/lingban-weapp-20260722-r4` 和压缩包 `release/mini-program/lingban-weapp-20260722-r4.zip`。压缩包解压后可直接作为微信开发者工具项目导入，服务器下载地址为 `http://192.168.31.20:38120/downloads/lingban-weapp-20260722-r4.zip`。
+最新发布快照保留独立目录 `release/mini-program/lingban-weapp-20260722-r5` 和压缩包 `release/mini-program/lingban-weapp-20260722-r5.zip`。压缩包解压后可直接作为微信开发者工具项目导入，服务器下载地址为 `http://192.168.31.20:38120/downloads/lingban-weapp-20260722-r5.zip`。
 
 WeChat Developer Tools can import `app/mobile/dist` directly. The release snapshot also contains a standalone directory and ZIP package whose root includes `app.js`, `app.json`, `app.wxss`, and `project.config.json`.
 
@@ -208,3 +208,22 @@ The WeChat runtime dispatches API calls through a dedicated lifecycle adapter wh
 微信构建校验会扫描所有 `confirmText` 常量并按平台加权长度规则拒绝超限文案。H5 E2E 会打开生命周期菜单、确认停止、断言 `POST /v1/runs/:runId/stop` 的 `graceful` 请求，并检查页面进入“运行环境已释放”状态。
 
 Task-list and task-detail stop confirmations use a platform-compliant four-character label. Build verification rejects oversized modal labels, while H5 E2E asserts the stop request and released runtime state.
+
+## 2026-07-22 Agent 图片渲染 / Agent Image Rendering
+
+- 任务对话支持 Markdown 图片、HTML `img`、消息附件以及普通相对路径中的 `png/jpeg/gif/webp/svg` 文件引用。
+- 本地路径统一归一化为当前 Run `targetPath` 下的逻辑相对路径；远程 URL、目录越界路径和无关绝对路径不会进入预览链路。
+- 图片通过 `GET /v1/runs/:runId/files/preview` 获取短期内联票据，H5 与微信小程序共享同一鉴权和文件权限边界。
+- 文件索引延迟期间最多轮询 15 次；票据到期前自动续签。失败后可重新加载或跳转到当前任务的文件页，并自动选中对应路径。
+- 图片容器使用稳定宽高比与 `aspectFit`。点按图片进入系统预览，微信端支持长按菜单，错误状态不会遮挡消息正文或输入区。
+
+The conversation surface resolves agent-generated local image references against the current run target directory, requests authorized inline preview tickets, and renders the result consistently in H5 and WeChat. Escaped paths and remote sources remain outside this local-file rendering path.
+
+验证命令：
+
+```bash
+pnpm typecheck
+pnpm test:message-images
+pnpm build:h5
+pnpm build:weapp
+```
