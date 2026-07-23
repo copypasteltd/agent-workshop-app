@@ -147,6 +147,7 @@ As of 2026-07-24, the H5 client covers the complete mobile workflow, including r
 | Public WeChat login route | 已部署；无效 code 返回 `401 / AUTH_WECHAT_CODE_INVALID / 40029` |
 | Current AppID account type | `gameApp=false / appType=0 / compileType=weapp` |
 | WeChat Developer Tools Preview | 2026-07-22 通过，官方 CLI 预览包 `1,225,374 Byte` |
+| WeChat attachment picker smoke | 2026-07-24 通过，原生文件选择生成附件草稿，运行时异常与错误日志均为 0 |
 | Real WeChat login | 两次 `wx.login` code 均成功换取会话，并复用用户 `usr_00000012` 与工作区 `wsp_00000012` |
 | Playwright Dashboard/Admin/H5 E2E | 34/34 通过，包含实例停止与释放链路 |
 | Mobile 页面状态视觉检查 | 14/14 通过 |
