@@ -14,6 +14,7 @@
     "new": "taro new",
     "typecheck": "tsc --noEmit",
     "test:creator-flow": "node --experimental-strip-types --test tests/mobile-creator-flow.test.ts",
+    "test:attachments": "node --experimental-strip-types --test tests/attachments.test.ts",
     "test:message-images": "node --experimental-strip-types --test tests/agent-message-images.test.ts",
     "test:message-media": "node --experimental-strip-types --test tests/agent-message-images.test.ts",
     "build:weapp": "taro build --type weapp && node scripts/verify-weapp-build.mjs",

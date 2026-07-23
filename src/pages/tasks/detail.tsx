@@ -14,7 +14,7 @@ import Taro from "@tarojs/taro";
 import { useMobileQuery as useQuery } from "../../lib/useMobileQuery";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { MobileTaskMessage } from "../../data/mobileData";
-import { formatAttachmentSize, pickBrowserAttachments, type BrowserAttachmentDraft } from "../../lib/attachments";
+import { formatAttachmentSize, pickLocalAttachments, type AttachmentDraft } from "../../lib/attachments";
 import {
   billingCostBasisLabel,
   billingSourceLabel,
@@ -457,7 +457,7 @@ function TaskDetailContent({ id }: { id?: string }) {
   const currentWorkspace = useResolvedMobileWorkspace();
   const runStream = useMobileRunStream(liveTaskId ? id ?? null : null, liveTaskId);
   const outgoingPayloadsRef = useRef<
-    Record<string, { text: string; drafts: BrowserAttachmentDraft[] }>
+    Record<string, { text: string; drafts: AttachmentDraft[] }>
   >({});
   const [captureSheetOpen, setCaptureSheetOpen] = useState(false);
   const [submittedCaptureId, setSubmittedCaptureId] = useState<string | null>(null);
@@ -727,7 +727,7 @@ function TaskDetailContent({ id }: { id?: string }) {
     Record<string, ReviewFormState>
   >({});
   const [attachmentDraftsByTask, setAttachmentDraftsByTask] = useState<
-    Record<string, BrowserAttachmentDraft[]>
+    Record<string, AttachmentDraft[]>
   >({});
   const draft = task ? taskDrafts[task.id] ?? "" : "";
   const attachmentDrafts = task ? attachmentDraftsByTask[task.id] ?? [] : [];
@@ -916,7 +916,7 @@ function TaskDetailContent({ id }: { id?: string }) {
     setTaskDraft(task.id, value);
     setComposerExpanded(true);
   };
-  const setTaskAttachments = (taskId: string, next: BrowserAttachmentDraft[]) => {
+  const setTaskAttachments = (taskId: string, next: AttachmentDraft[]) => {
     setAttachmentDraftsByTask((current) => ({
       ...current,
       [taskId]: next,
@@ -962,7 +962,7 @@ function TaskDetailContent({ id }: { id?: string }) {
   };
   const rememberOutgoingPayload = (
     localId: string,
-    payload: { text: string; drafts: BrowserAttachmentDraft[] }
+    payload: { text: string; drafts: AttachmentDraft[] }
   ) => {
     outgoingPayloadsRef.current[localId] = payload;
   };
@@ -1017,7 +1017,7 @@ function TaskDetailContent({ id }: { id?: string }) {
       taskId: string;
       createdAt: string;
       text: string;
-      drafts: BrowserAttachmentDraft[];
+      drafts: AttachmentDraft[];
     }) => {
       const activeTaskId = task?.id ?? input.taskId;
       if (!activeTaskId) {
@@ -1028,10 +1028,10 @@ function TaskDetailContent({ id }: { id?: string }) {
       const attachments = await Promise.all(
         input.drafts.map(async (draftAttachment) =>
           uploadRunAttachment(mobileRunsApi, activeTaskId, {
-            fileName: draftAttachment.file.name,
+            fileName: draftAttachment.fileName,
             contentType: draftAttachment.contentType,
             sizeBytes: draftAttachment.sizeBytes,
-            content: await draftAttachment.file.arrayBuffer(),
+            content: await draftAttachment.readContent(),
             label: draftAttachment.label,
           })
         )
@@ -1111,7 +1111,7 @@ function TaskDetailContent({ id }: { id?: string }) {
           createdAt: variables.createdAt,
           attachments: variables.drafts.map((item) => ({
             label: item.label,
-            path: item.file.name,
+            path: item.fileName,
           })),
           status: "failed" as const,
           errorMessage: null,
@@ -1299,7 +1299,7 @@ function TaskDetailContent({ id }: { id?: string }) {
     });
   };
 
-  const queueOutgoingMessage = (text: string, drafts: BrowserAttachmentDraft[]) => {
+  const queueOutgoingMessage = (text: string, drafts: AttachmentDraft[]) => {
     if (!task) {
       return;
     }
@@ -1314,7 +1314,7 @@ function TaskDetailContent({ id }: { id?: string }) {
       createdAt,
       attachments: drafts.map((item) => ({
         label: item.label,
-        path: item.file.name,
+        path: item.fileName,
       })),
       status: drafts.length > 0 ? "uploading" : "sending",
       errorMessage: null,
@@ -2309,7 +2309,7 @@ function TaskDetailContent({ id }: { id?: string }) {
                   disabled={sendMessageMutation.isPending || hasInFlightOutgoing}
                   onClick={async () => {
                     try {
-                      const picked = await pickBrowserAttachments({ multiple: true });
+                      const picked = await pickLocalAttachments({ multiple: true });
                       if (!picked.length || !task) {
                         return;
                       }

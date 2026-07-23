@@ -1,44 +1,59 @@
-export type BrowserAttachmentDraft = {
-  id: string;
-  file: File;
-  label: string;
-  sizeBytes: number;
-  contentType: string | null;
+import Taro from "@tarojs/taro";
+import {
+  inferAttachmentContentType,
+  nextAttachmentDraftId,
+  pickMiniProgramAttachments as pickMiniProgramAttachmentsWithRuntime,
+  resolveAttachmentPickerCount,
+  validateAttachment,
+  type AttachmentDraft,
+  type AttachmentPickerOptions,
+  type MiniProgramAttachmentRuntime,
+} from "./attachmentCore";
+
+export {
+  formatAttachmentSize,
+  inferAttachmentContentType,
+  isAttachmentPickerCancellation,
+  MAX_ATTACHMENT_BYTES,
+  MAX_ATTACHMENT_COUNT,
+  type AttachmentDraft,
+  type AttachmentPickerOptions,
+  type MiniProgramAttachmentRuntime,
+  type MiniProgramChosenFile,
+} from "./attachmentCore";
+
+function defaultMiniProgramReadFile(filePath: string) {
+  return new Promise<ArrayBuffer>((resolve, reject) => {
+    Taro.getFileSystemManager().readFile({
+      filePath,
+      success(result) {
+        if (result.data instanceof ArrayBuffer) {
+          resolve(result.data);
+          return;
+        }
+
+        reject(new Error("微信临时文件未返回二进制内容。"));
+      },
+      fail(result) {
+        reject(new Error(result.errMsg || "微信临时文件读取失败。"));
+      },
+    });
+  });
+}
+
+const defaultMiniProgramRuntime: MiniProgramAttachmentRuntime = {
+  chooseMessageFile: (input) => Taro.chooseMessageFile(input),
+  readFile: defaultMiniProgramReadFile,
 };
 
-function nextDraftId() {
-  return `att_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-}
-
-export function formatAttachmentSize(sizeBytes: number) {
-  if (!Number.isFinite(sizeBytes) || sizeBytes <= 0) {
-    return "0 B";
-  }
-
-  if (sizeBytes < 1024) {
-    return `${sizeBytes} B`;
-  }
-
-  if (sizeBytes < 1024 * 1024) {
-    return `${(sizeBytes / 1024).toFixed(1)} KB`;
-  }
-
-  if (sizeBytes < 1024 * 1024 * 1024) {
-    return `${(sizeBytes / (1024 * 1024)).toFixed(1)} MB`;
-  }
-
-  return `${(sizeBytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
-}
-
-export async function pickBrowserAttachments(options?: {
-  multiple?: boolean;
-  accept?: string;
-}): Promise<BrowserAttachmentDraft[]> {
+export async function pickBrowserAttachments(
+  options?: AttachmentPickerOptions
+): Promise<AttachmentDraft[]> {
   if (typeof document === "undefined") {
-    throw new Error("当前环境暂不支持直接选择本地文件。");
+    throw new Error("当前环境暂不支持浏览器文件选择器。");
   }
 
-  return await new Promise<BrowserAttachmentDraft[]>((resolve) => {
+  return await new Promise<AttachmentDraft[]>((resolve, reject) => {
     const input = document.createElement("input");
     input.type = "file";
     input.multiple = options?.multiple ?? true;
@@ -54,17 +69,26 @@ export async function pickBrowserAttachments(options?: {
     input.addEventListener(
       "change",
       () => {
-        const files = Array.from(input.files ?? []);
+        const files = Array.from(input.files ?? []).slice(0, resolveAttachmentPickerCount(options));
         cleanup();
-        resolve(
-          files.map((file) => ({
-            id: nextDraftId(),
-            file,
-            label: file.name,
-            sizeBytes: file.size,
-            contentType: file.type || null,
-          }))
-        );
+
+        try {
+          resolve(
+            files.map((file) => {
+              validateAttachment(file.name, file.size);
+              return {
+                id: nextAttachmentDraftId(),
+                fileName: file.name,
+                label: file.name,
+                sizeBytes: file.size,
+                contentType: file.type || inferAttachmentContentType(file.name),
+                readContent: () => file.arrayBuffer(),
+              };
+            })
+          );
+        } catch (error) {
+          reject(error);
+        }
       },
       { once: true }
     );
@@ -80,4 +104,14 @@ export async function pickBrowserAttachments(options?: {
       resolve([]);
     }, 60_000);
   });
+}
+
+export function pickMiniProgramAttachments(options?: AttachmentPickerOptions) {
+  return pickMiniProgramAttachmentsWithRuntime(options, defaultMiniProgramRuntime);
+}
+
+export function pickLocalAttachments(options?: AttachmentPickerOptions) {
+  return process.env.TARO_ENV === "weapp"
+    ? pickMiniProgramAttachments(options)
+    : pickBrowserAttachments(options);
 }

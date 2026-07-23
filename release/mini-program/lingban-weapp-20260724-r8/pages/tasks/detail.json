@@ -1,0 +1,6 @@
+{
+  "navigationBarTitleText": "任务会话",
+  "usingComponents": {
+    "comp": "../../comp"
+  }
+}

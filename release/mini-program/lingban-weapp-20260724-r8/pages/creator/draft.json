@@ -1,0 +1,6 @@
+{
+  "navigationBarTitleText": "Session 审核",
+  "usingComponents": {
+    "comp": "../../comp"
+  }
+}

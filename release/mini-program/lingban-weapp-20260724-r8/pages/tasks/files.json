@@ -1,0 +1,6 @@
+{
+  "navigationBarTitleText": "任务文件",
+  "usingComponents": {
+    "comp": "../../comp"
+  }
+}

@@ -116,10 +116,28 @@ for (const marker of [
   "message-video-preview",
   "previewRunFile",
   "previewImage",
+  "chooseMessageFile",
+  "getFileSystemManager",
+  "readFile",
 ]) {
   if (!taskDetailPageSource.includes(marker)) {
     throw new Error(`Missing collapsible task composer marker: ${marker}`);
   }
+}
+
+const taskDetailSourcePath = path.join(
+  projectRoot,
+  "src",
+  "pages",
+  "tasks",
+  "detail.tsx"
+);
+const taskDetailSource = readFileSync(taskDetailSourcePath, "utf8");
+if (!taskDetailSource.includes("pickLocalAttachments({ multiple: true })")) {
+  throw new Error("Task attachment action must use the cross-platform attachment picker");
+}
+if (taskDetailSource.includes("pickBrowserAttachments({ multiple: true })")) {
+  throw new Error("Browser-only attachment picker leaked into the task attachment action");
 }
 
 const taskFilesPageSource = readFileSync(

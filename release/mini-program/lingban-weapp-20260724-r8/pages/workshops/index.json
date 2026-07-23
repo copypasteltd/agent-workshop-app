@@ -1,0 +1,6 @@
+{
+  "navigationBarTitleText": "工坊",
+  "usingComponents": {
+    "comp": "../../comp"
+  }
+}
