@@ -110,13 +110,25 @@ for (const marker of [
   "composer-collapsed",
   "composer-expanded",
   "task-composer-chevron",
-  "mobile-message-image-",
+  "mobile-message-",
   "message-image-card",
+  "message-video-frame",
+  "message-video-preview",
   "previewRunFile",
   "previewImage",
 ]) {
   if (!taskDetailPageSource.includes(marker)) {
     throw new Error(`Missing collapsible task composer marker: ${marker}`);
+  }
+}
+
+const taskFilesPageSource = readFileSync(
+  path.join(distRoot, "pages", "tasks", "files.js"),
+  "utf8"
+);
+for (const marker of ["preview-video-shell", "preview-video", "video"]) {
+  if (!taskFilesPageSource.includes(marker)) {
+    throw new Error(`Missing task file video preview marker: ${marker}`);
   }
 }
 

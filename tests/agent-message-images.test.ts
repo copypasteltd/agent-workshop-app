@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  isAgentMediaAttachment,
   normalizeAgentImagePath,
+  normalizeAgentMediaPath,
+  parseAgentMessageMedia,
   parseAgentMessageImages,
 } from "../src/lib/agentMessageImages.ts";
 
@@ -59,4 +62,42 @@ test("keeps unsupported remote image markup visible", () => {
   const parsed = parseAgentMessageImages(text, "/srv/lingban/runs/run_1/target");
   assert.equal(parsed.displayText, text);
   assert.deepEqual(parsed.images, []);
+});
+
+test("normalizes local video paths and rejects escaped video paths", () => {
+  const target = "/srv/lingban/runs/run_1/target";
+  assert.equal(normalizeAgentMediaPath("./output/episode.mp4", target), "output/episode.mp4");
+  assert.equal(
+    normalizeAgentMediaPath("/workspace/target/output/episode.webm", target),
+    "output/episode.webm"
+  );
+  assert.equal(normalizeAgentMediaPath("../outside.mov", target), null);
+  assert.equal(isAgentMediaAttachment("output/episode.m4v", target), true);
+});
+
+test("extracts markdown, html and attachment videos without duplicates", () => {
+  const parsed = parseAgentMessageMedia(
+    "完成：\n[播放短剧](./output/episode.mp4)\n<video src='./output/trailer.webm'></video>",
+    "/workspace/target",
+    [
+      { label: "duplicate", path: "output/episode.mp4" },
+      { label: "notes", path: "output/notes.txt" },
+    ]
+  );
+
+  assert.deepEqual(
+    parsed.videos.map((video) => ({ label: video.label, filePath: video.filePath })),
+    [
+      { label: "播放短剧", filePath: "output/episode.mp4" },
+      { label: "trailer.webm", filePath: "output/trailer.webm" },
+    ]
+  );
+  assert.equal(parsed.displayText, "完成：");
+});
+
+test("keeps unsupported remote video links visible", () => {
+  const text = "[远程视频](https://example.com/episode.mp4)";
+  const parsed = parseAgentMessageMedia(text, "/workspace/target");
+  assert.equal(parsed.displayText, text);
+  assert.deepEqual(parsed.videos, []);
 });

@@ -44,7 +44,7 @@ import { useResolvedMobileWorkspace } from "../../lib/useMobileWorkspace";
 import { useMobileRouteParams } from "../../lib/useMobileRouteParams";
 import { useMobilePageShellClass } from "../../components/MobilePageShell";
 import { MobileMessageContent } from "../../components/MobileMessageContent";
-import { isAgentImageAttachment } from "../../lib/agentMessageImages";
+import { isAgentMediaAttachment } from "../../lib/agentMessageImages";
 import { useMobileShareDisabled } from "../../lib/mobileShare";
 import {
   useMobileUiStore,
@@ -2091,12 +2091,12 @@ function TaskDetailContent({ id }: { id?: string }) {
                 </View>
               ) : null}
               {message.attachments?.some(
-                (attachment) => !isAgentImageAttachment(attachment.path, task.targetPath)
+                (attachment) => !isAgentMediaAttachment(attachment.path, task.targetPath)
               ) ? (
                 <View className="message-attachment-list">
                   {message.attachments
                     .filter(
-                      (attachment) => !isAgentImageAttachment(attachment.path, task.targetPath)
+                      (attachment) => !isAgentMediaAttachment(attachment.path, task.targetPath)
                     )
                     .map((attachment) => (
                       <View className="message-attachment-chip" key={`${attachment.path}-${attachment.label}`}>

@@ -227,3 +227,23 @@ pnpm test:message-images
 pnpm build:h5
 pnpm build:weapp
 ```
+
+## 2026-07-23 Agent 视频渲染 / Agent Video Rendering
+
+- 任务会话识别 Markdown 链接、HTML `video/source`、消息附件和普通文本中的本地视频路径。
+- 支持 `mp4`、`webm`、`mov`、`m4v`、`ogv`、`ogg`；最终播放能力同时受浏览器、微信基础库和视频编码格式约束。
+- H5 与微信小程序使用 Taro `Video` 组件，播放器固定为 16:9，提供播放、进度拖动和全屏控制。
+- 文件页对 `video` 预览模式直接显示播放器；失败时保留重新加载、文件页查看和下载路径。
+- 视频与图片共享 target path 校验、短期内联票据、索引等待和到期前续签逻辑。
+- 微信构建门禁检查会话播放器、文件页播放器、API 地址和私有页面分享边界。
+
+The mobile conversation and file surfaces render authorized agent-generated videos with stable 16:9 controls in H5 and WeChat. Local media paths remain scoped to the active run target and use short-lived inline preview tickets.
+
+验证命令：
+
+```bash
+pnpm typecheck
+pnpm test:message-media
+pnpm build:h5
+pnpm build:weapp
+```

@@ -1,7 +1,7 @@
 import type { RunFileEntry } from "@lingban/contracts";
 import { matchesSearchQuery } from "@lingban/domain-models";
 import { useMobileQuery as useQuery } from "../../lib/useMobileQuery";
-import { Button, Image, Input, View } from "@tarojs/components";
+import { Button, Image, Input, Video, View } from "@tarojs/components";
 import Taro from "@tarojs/taro";
 import { useEffect, useMemo, useState } from "react";
 import { mobileRunsApi, requestMobileRunFileDownloadUrl } from "../../lib/api";
@@ -17,7 +17,7 @@ import { useResolvedMobileWorkspace } from "../../lib/useMobileWorkspace";
 import { useMobileRouteParams } from "../../lib/useMobileRouteParams";
 import { useMobilePageShellClass } from "../../components/MobilePageShell";
 import { useMobileShareDisabled } from "../../lib/mobileShare";
-import { normalizeAgentImagePath } from "../../lib/agentMessageImages";
+import { normalizeAgentMediaPath } from "../../lib/agentMessageImages";
 
 function ensureTrailingSlash(value: string) {
   return value.endsWith("/") ? value : `${value}/`;
@@ -265,7 +265,7 @@ function TaskFilesContent({ id, initialFilePath }: { id?: string; initialFilePat
     setCurrentPath(nextPath);
     setInputPath(nextPath);
     const requestedRelativePath = initialFilePath
-      ? normalizeAgentImagePath(initialFilePath, task.targetPath)
+      ? normalizeAgentMediaPath(initialFilePath, task.targetPath)
       : null;
     const requestedAbsolutePath = requestedRelativePath
       ? `${ensureTrailingSlash(task.targetPath)}${requestedRelativePath}`
@@ -559,6 +559,17 @@ function TaskFilesContent({ id, initialFilePath }: { id?: string; initialFilePat
                   className="preview-image"
                   src={filePreviewQuery.data.downloadUrl}
                   mode="widthFix"
+                />
+              </View>
+            ) : filePreviewQuery.data.mode === "video" && filePreviewQuery.data.downloadUrl ? (
+              <View className="preview-media-shell preview-video-shell">
+                <Video
+                  className="preview-video"
+                  src={filePreviewQuery.data.downloadUrl}
+                  controls
+                  objectFit="contain"
+                  showCenterPlayBtn
+                  enableProgressGesture
                 />
               </View>
             ) : filePreviewQuery.data.mode === "pdf" && filePreviewQuery.data.downloadUrl ? (
