@@ -141,7 +141,7 @@ As of 2026-07-21, the H5 client covers the complete mobile workflow, including r
 | TypeScript | 通过 |
 | H5 production build | 通过 |
 | WeChat Mini Program production build | 通过 |
-| 最新微信交付产物 | `r5`，60 个文件，`1,231,084 Byte`，SHA-256 `70E22AFAEE8A9118AD733AD784F0ED7EF21B5EB669D997E18801F9380CCF465E` |
+| 最新微信交付产物 | `r7`，60 个文件，`507,333 Byte`，SHA-256 `433056681F978CDF7053DABFF924DF92B4BC01505AD2496733F11C37126F0C45` |
 | Public API health | `GET https://codex-miniapp.sidcloud.cn/health` 返回 `200` |
 | WeChat login API local smoke | 通过 |
 | Public WeChat login route | 已部署；无效 code 返回 `401 / AUTH_WECHAT_CODE_INVALID / 40029` |
@@ -156,13 +156,13 @@ As of 2026-07-21, the H5 client covers the complete mobile workflow, including r
 
 微信开发者工具可直接导入 `app/mobile/dist`。该目录的 `project.config.json` 使用 `miniprogramRoot: "./"`，AppID 为 `wx4b21e9b9200dcf9b`，基础库固定为 `3.15.2`。
 
-最新发布快照保留独立目录 `release/mini-program/lingban-weapp-20260722-r5` 和压缩包 `release/mini-program/lingban-weapp-20260722-r5.zip`。压缩包解压后可直接作为微信开发者工具项目导入，服务器下载地址为 `http://192.168.31.20:38120/downloads/lingban-weapp-20260722-r5.zip`。
+最新发布快照保留独立目录 `release/mini-program/lingban-weapp-20260723-r7` 和压缩包 `release/mini-program/lingban-weapp-20260723-r7.zip`。压缩包解压后可直接作为微信开发者工具项目导入，服务器下载地址为 `http://192.168.31.20:38120/downloads/lingban-weapp-20260723-r7.zip`。
 
 WeChat Developer Tools can import `app/mobile/dist` directly. The release snapshot also contains a standalone directory and ZIP package whose root includes `app.js`, `app.json`, `app.wxss`, and `project.config.json`.
 
-微信认证后端与公网路由已上线。当前使用 `灵办` 微信小程序凭证，并需在微信公众平台登记 `https://codex-miniapp.sidcloud.cn` 为 `request` 合法域名。文件上传、下载、预览和订阅消息需要继续完成微信端专项适配。支付宝端能力保持后续计划。
+微信认证后端与公网路由已上线。当前使用 `灵办` 微信小程序凭证，并需在微信公众平台登记 `https://codex-miniapp.sidcloud.cn` 为 `request` 合法域名。任务附件上传、下载以及 Agent 图片和视频预览已进入微信构建产物；订阅消息与提审配置保持后续计划。支付宝端能力保持后续计划。
 
-Credentialed WeChat device testing, file APIs, subscription messages, and review configuration remain before production submission.
+The WeChat build includes authenticated task file transfer and Agent image/video previews. Subscription messages and review configuration remain before production submission.
 
 ## 微信分享 / WeChat Sharing
 
