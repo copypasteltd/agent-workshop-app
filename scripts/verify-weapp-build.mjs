@@ -119,6 +119,9 @@ for (const marker of [
   "chooseMessageFile",
   "getFileSystemManager",
   "readFile",
+  "setClipboardData",
+  "message-copy-button",
+  "userSelect",
 ]) {
   if (!taskDetailPageSource.includes(marker)) {
     throw new Error(`Missing collapsible task composer marker: ${marker}`);

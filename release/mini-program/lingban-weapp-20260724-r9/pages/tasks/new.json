@@ -1,0 +1,6 @@
+{
+  "navigationBarTitleText": "新建实例",
+  "usingComponents": {
+    "comp": "../../comp"
+  }
+}

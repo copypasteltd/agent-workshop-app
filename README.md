@@ -132,22 +132,23 @@ Session Capture does not add a bottom navigation tab. The product navigation rem
 
 ## 当前状态 / Current Status
 
-截至 2026-07-24，H5 已接入认证、工作区、工坊、服务、任务、实时对话、上传、文件、审批、Provider 选择、配额摘要、Session Capture、实例生命周期与个人中心主链。微信小程序生产构建、`Taro.login` 登录入口、统一认证令牌、请求运行时、任务附件和实例生命周期入口已完成。
+截至 2026-07-24，H5 已接入认证、工作区、工坊、服务、任务、实时对话、上传、文件、审批、Provider 选择、配额摘要、Session Capture、实例生命周期与个人中心主链。微信小程序生产构建、`Taro.login` 登录入口、统一认证令牌、请求运行时、任务附件、消息复制和实例生命周期入口已完成。
 
-As of 2026-07-24, the H5 client covers the complete mobile workflow, including run lifecycle management. The WeChat Mini Program production build, `Taro.login` entry point, shared authentication tokens, request runtime, task attachments, and lifecycle actions are implemented.
+As of 2026-07-24, the H5 client covers the complete mobile workflow, including run lifecycle management. The WeChat Mini Program production build, `Taro.login` entry point, shared authentication tokens, request runtime, task attachments, message copying, and lifecycle actions are implemented.
 
 | 验证项 | 结果 |
 | --- | --- |
 | TypeScript | 通过 |
 | H5 production build | 通过 |
 | WeChat Mini Program production build | 通过 |
-| 最新微信交付产物 | `r8`，60 个文件，`507,845 Byte`，SHA-256 `BC3CFAF15CA0EAB752CE65892E544E1D419A6E104C4E9AD0B86C369647FA7B07` |
+| 最新微信交付产物 | `r9`，60 个文件，`508,213 Byte`，SHA-256 `68030A1E095DE4D028A2C144EC624820F332BDED53C57D889AB339821FB4D876` |
 | Public API health | `GET https://codex-miniapp.sidcloud.cn/health` 返回 `200` |
 | WeChat login API local smoke | 通过 |
 | Public WeChat login route | 已部署；无效 code 返回 `401 / AUTH_WECHAT_CODE_INVALID / 40029` |
 | Current AppID account type | `gameApp=false / appType=0 / compileType=weapp` |
 | WeChat Developer Tools Preview | 2026-07-22 通过，官方 CLI 预览包 `1,225,374 Byte` |
 | WeChat attachment picker smoke | 2026-07-24 通过，原生文件选择生成附件草稿，运行时异常与错误日志均为 0 |
+| WeChat message copy smoke | 2026-07-24 通过，完整消息进入 `setClipboardData`，长按选择属性与按钮布局验证通过 |
 | Real WeChat login | 两次 `wx.login` code 均成功换取会话，并复用用户 `usr_00000012` 与工作区 `wsp_00000012` |
 | Playwright Dashboard/Admin/H5 E2E | 34/34 通过，包含实例停止与释放链路 |
 | Mobile 页面状态视觉检查 | 14/14 通过 |
@@ -157,7 +158,7 @@ As of 2026-07-24, the H5 client covers the complete mobile workflow, including r
 
 微信开发者工具可直接导入 `app/mobile/dist`。该目录的 `project.config.json` 使用 `miniprogramRoot: "./"`，AppID 为 `wx4b21e9b9200dcf9b`，基础库固定为 `3.15.2`。
 
-最新发布快照保留独立目录 `release/mini-program/lingban-weapp-20260724-r8` 和压缩包 `release/mini-program/lingban-weapp-20260724-r8.zip`。压缩包解压后可直接作为微信开发者工具项目导入，服务器下载地址为 `http://192.168.31.20:38120/downloads/lingban-weapp-20260724-r8.zip`。
+最新发布快照保留独立目录 `release/mini-program/lingban-weapp-20260724-r9` 和压缩包 `release/mini-program/lingban-weapp-20260724-r9.zip`。压缩包解压后可直接作为微信开发者工具项目导入，服务器下载地址为 `http://192.168.31.20:38120/downloads/lingban-weapp-20260724-r9.zip`。
 
 WeChat Developer Tools can import `app/mobile/dist` directly. The release snapshot also contains a standalone directory and ZIP package whose root includes `app.js`, `app.json`, `app.wxss`, and `project.config.json`.
 
@@ -174,6 +175,16 @@ The WeChat build includes authenticated task file transfer and Agent image/video
 - 微信构建门禁检查跨端选择入口、`chooseMessageFile`、文件系统读取与浏览器专用实现泄漏。
 
 The task composer now uses the native WeChat message-file picker and file-system API while preserving the browser picker on H5. Attachment selection, cancellation, limits, repeatable reads, and build markers have dedicated regression coverage.
+
+## 2026-07-24 Message Copy / 2026-07-24 消息复制
+
+- 每条系统、用户和 Agent 消息提供独立复制图标，调用 `Taro.setClipboardData` 写入完整原始正文并显示操作结果。
+- 消息正文使用微信 `Text` 组件，并同时启用 `selectable` 与 `userSelect`，支持长按选择局部文本。
+- 复制按钮使用稳定的 27px 触控尺寸和 14px 图标，不挤压角色、时间和消息正文。
+- 微信构建门禁检查剪贴板 API、复制按钮及原生文本选择属性。
+- 开发者工具验收通过 API 调用拦截核对完整多行文本；运行时异常与错误日志均为 0。
+
+Every system, user, and Agent message now supports full-message clipboard copying and native long-press text selection in the WeChat Mini Program.
 
 ## 微信分享 / WeChat Sharing
 

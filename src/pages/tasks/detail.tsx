@@ -25,6 +25,7 @@ import {
 import { mobileBillingApi, mobileQuotaApi, mobileRunsApi, mobileSessionCapturesApi } from "../../lib/api";
 import archiveIcon from "../../assets/archive.svg";
 import chevronDownIcon from "../../assets/chevron-down.svg";
+import copyIcon from "../../assets/copy.svg";
 import moreHorizontalIcon from "../../assets/more-horizontal.svg";
 import { isLiveTaskId, mapRunSnapshotToMobileTask } from "../../lib/liveTaskAdapters";
 import {
@@ -63,6 +64,20 @@ function formatQuotaTime(value: string) {
     minute: "2-digit",
     hour12: false,
   });
+}
+
+async function copyMessageText(text: string) {
+  if (!text.trim()) {
+    await Taro.showToast({ title: "当前消息没有可复制文本", icon: "none" });
+    return;
+  }
+
+  try {
+    await Taro.setClipboardData({ data: text });
+    await Taro.showToast({ title: "消息已复制", icon: "success" });
+  } catch {
+    await Taro.showToast({ title: "复制失败，请重试", icon: "none" });
+  }
 }
 
 function formatBillingTime(value: string | null) {
@@ -2067,7 +2082,17 @@ function TaskDetailContent({ id }: { id?: string }) {
                   <View className={`message-role-marker ${message.kind}`} />
                   <View className="role">{message.role}</View>
                 </View>
-                <View className="time">{message.time}</View>
+                <View className="message-head-actions">
+                  <View className="time">{message.time}</View>
+                  <Button
+                    aria-label={`复制${message.role}消息`}
+                    className="message-copy-button"
+                    data-testid={`mobile-message-copy-${index}`}
+                    onClick={() => void copyMessageText(message.body)}
+                  >
+                    <Image className="message-copy-icon" src={copyIcon} mode="aspectFit" />
+                  </Button>
+                </View>
               </View>
               <MobileMessageContent
                 runId={task.id}

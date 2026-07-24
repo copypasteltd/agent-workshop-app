@@ -277,6 +277,43 @@ body[data-theme="light"] .task-detail-page .capture-sheet-icon {
   gap: 7px;
 }
 
+.task-detail-page .message-head-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+}
+
+.task-detail-page .message-copy-button {
+  display: inline-flex;
+  width: 26px;
+  min-width: 26px;
+  height: 26px;
+  min-height: 26px;
+  margin: 0;
+  padding: 0;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--task-divider);
+  border-radius: 4px;
+  background: var(--task-panel-raised);
+  line-height: 1;
+}
+
+.task-detail-page .message-copy-button::after {
+  border: 0;
+}
+
+.task-detail-page .message-copy-button:active {
+  background: var(--task-panel-strong);
+}
+
+.task-detail-page .message-copy-icon {
+  display: block;
+  width: 14px;
+  height: 14px;
+}
+
 .task-detail-page .message-role-marker {
   width: 7px;
   height: 7px;
@@ -316,10 +353,13 @@ body[data-theme="light"] .task-detail-page .capture-sheet-icon {
 }
 
 .task-detail-page .message-body {
+  display: block;
   color: var(--text);
   font-size: 13px;
   line-height: 1.62;
   overflow-wrap: anywhere;
+  -webkit-user-select: text;
+  user-select: text;
   white-space: pre-wrap;
 }
 

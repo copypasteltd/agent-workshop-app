@@ -1,5 +1,5 @@
 import type { RunConversationAttachment } from "@lingban/contracts";
-import { Button, Image, Video, View } from "@tarojs/components";
+import { Button, Image, Text, Video, View } from "@tarojs/components";
 import Taro from "@tarojs/taro";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { mobileRunsApi } from "../lib/api";
@@ -149,7 +149,11 @@ export function MobileMessageContent({
 
   return (
     <>
-      {parsed.displayText ? <View className="message-body">{parsed.displayText}</View> : null}
+      {parsed.displayText ? (
+        <Text className="message-body" selectable userSelect>
+          {parsed.displayText}
+        </Text>
+      ) : null}
       {parsed.media.length > 0 ? (
         <View className="message-image-list message-media-list">
           {parsed.media.map((media) => (
